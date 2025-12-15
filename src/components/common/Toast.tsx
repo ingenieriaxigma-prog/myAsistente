@@ -152,14 +152,9 @@ export function ConfirmModal({
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-fade-in">
       <div className="bg-white rounded-2xl p-6 max-w-xs w-full shadow-2xl animate-scale-in">
-        {/* Figma icon placeholder */}
         <div className="flex justify-center mb-4">
-          <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center">
-            <svg viewBox="0 0 38 57" className="w-8 h-12">
-              <path fill="#fff" d="M19 28.5a9.5 9.5 0 0 1 9.5-9.5H38V9.5A9.5 9.5 0 0 0 28.5 0h-19A9.5 9.5 0 0 0 0 9.5v19A9.5 9.5 0 0 0 9.5 38H19v-9.5Z"/>
-              <path fill="#fff" opacity="0.6" d="M19 38a9.5 9.5 0 1 0 0 19v-19Z"/>
-              <circle fill="#fff" opacity="0.8" cx="28.5" cy="28.5" r="9.5"/>
-            </svg>
+          <div className="w-14 h-14 bg-blue-600 rounded-xl flex items-center justify-center">
+            <span className="text-white font-bold text-xl">my</span>
           </div>
         </div>
         

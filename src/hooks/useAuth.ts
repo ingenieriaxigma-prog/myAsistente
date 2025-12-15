@@ -109,7 +109,7 @@ export function useAuth() {
       
       while (retries > 0 && !profile) {
         try {
-          const profileData = await authApi.getProfile();
+          const profileData = await authApi.getProfile(result.session?.access_token);
           profile = profileData.profile;
           console.log('[useAuth.signIn] Profile fetched successfully:', profile);
           setUser(profile);

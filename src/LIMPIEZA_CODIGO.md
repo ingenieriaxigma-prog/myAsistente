@@ -159,7 +159,7 @@ Estos archivos **NUNCA** deben modificarse sin autorización:
 
 - `/supabase/functions/server/kv_store.tsx`
 - `/utils/supabase/info.tsx`
-- `/components/figma/ImageWithFallback.tsx`
+ - `/components/figma/ImageWithFallback.tsx` (carpeta legada de assets visuales; no renombrar sin autorización)
 
 ---
 

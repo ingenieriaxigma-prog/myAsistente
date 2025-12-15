@@ -4,8 +4,16 @@ import type { Attachment, Message } from '../types';
 
 const API_BASE_URL = `https://${projectId}.supabase.co/functions/v1/make-server-baa51d6b`;
 
-// Helper to get auth header - SIMPLIFIED VERSION
-async function getAuthHeader(): Promise<string> {
+type ApiCallOptions = RequestInit & {
+  accessTokenOverride?: string;
+};
+
+// Helper to get auth header - allows override to skip session fetch when ya se tiene el token
+async function getAuthHeader(accessTokenOverride?: string): Promise<string> {
+  if (accessTokenOverride) {
+    return `Bearer ${accessTokenOverride}`;
+  }
+
   try {
     // Try to get the session with a simple approach
     const { data: { session } } = await supabase.auth.getSession();
@@ -24,12 +32,12 @@ async function getAuthHeader(): Promise<string> {
 }
 
 // Helper for API calls
-async function apiCall(endpoint: string, options: RequestInit = {}) {
+async function apiCall(endpoint: string, options: ApiCallOptions = {}) {
   try {
     console.log(`[apiCall] Starting API call to: ${endpoint}`);
     
     console.log(`[apiCall] Getting auth header...`);
-    const authHeader = await getAuthHeader();
+    const authHeader = await getAuthHeader(options.accessTokenOverride);
     console.log(`[apiCall] Auth header obtained:`, authHeader.substring(0, 20) + '...');
     
     const fullUrl = `${API_BASE_URL}${endpoint}`;
@@ -214,9 +222,10 @@ export const authApi = {
   },
 
   // Get user profile
-  async getProfile() {
+  async getProfile(accessTokenOverride?: string) {
     return apiCall('/auth/profile', {
       method: 'GET',
+      accessTokenOverride,
     });
   },
 
