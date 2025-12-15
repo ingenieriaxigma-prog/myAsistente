@@ -1,0 +1,125 @@
+{
+  "specialty": "coloprocto",
+  "version": "1.0.0",
+  "updated_at": "2025-12-13T00:00:00Z",
+  "language": "es",
+  "metadata": {
+    "total_chunks": 8,
+    "sources": ["manual_coloproctologia.pdf", "guia_hemorroides.pdf"],
+    "description": "Base de conocimiento sobre coloproctología: hemorroides, fisuras anales, enfermedad inflamatoria intestinal, cáncer colorrectal y estreñimiento"
+  },
+  "chunks": [
+    {
+      "id": "colop_001",
+      "content": "Las hemorroides son venas inflamadas en el recto inferior y el ano. Se clasifican en internas (dentro del recto, generalmente indoloras pero sangran) y externas (bajo la piel alrededor del ano, dolorosas y pueden formar coágulos). Los síntomas incluyen sangrado rojo brillante al defecar, picazón anal, dolor y sensación de bulto. Afectan al 50% de adultos mayores de 50 años.",
+      "metadata": {
+        "source": "guia_hemorroides.pdf",
+        "source_type": "pdf",
+        "page": 8,
+        "topic": "hemorroides",
+        "gender_relevance": ["all"],
+        "problem_areas": ["pelvis", "abdomen"],
+        "keywords": ["hemorroides", "sangrado", "dolor", "anal", "venas"],
+        "clinical_level": "basic"
+      }
+    },
+    {
+      "id": "colop_002",
+      "content": "El tratamiento conservador de hemorroides incluye aumentar fibra dietética (25-30g/día), hidratación adecuada (2L agua/día), baños de asiento con agua tibia 3-4 veces al día, evitar esfuerzo al defecar y usar cremas tópicas con corticoides. El 90% de casos leves responden a estas medidas en 2-4 semanas. Si persisten, se consideran tratamientos mínimamente invasivos como ligadura con banda elástica.",
+      "metadata": {
+        "source": "guia_hemorroides.pdf",
+        "source_type": "pdf",
+        "page": 23,
+        "topic": "tratamiento_hemorroides",
+        "gender_relevance": ["all"],
+        "problem_areas": ["pelvis", "abdomen"],
+        "keywords": ["tratamiento", "fibra", "dieta", "baños", "conservador"],
+        "clinical_level": "basic"
+      }
+    },
+    {
+      "id": "colop_003",
+      "content": "La fisura anal es una pequeña rasgadura en el revestimiento del ano, causando dolor intenso durante y después de la defecación, sangrado rojo brillante y espasmo del esfínter. El 90% ocurren en la línea media posterior. Las causas incluyen estreñimiento, diarrea crónica, parto y enfermedad de Crohn. El tratamiento inicial incluye ablandadores fecales, fibra, baños de asiento y nitroglicerina tópica al 0.2% para relajar el esfínter.",
+      "metadata": {
+        "source": "manual_coloproctologia.pdf",
+        "source_type": "pdf",
+        "page": 45,
+        "topic": "fisura_anal",
+        "gender_relevance": ["all"],
+        "problem_areas": ["pelvis"],
+        "keywords": ["fisura", "anal", "dolor", "sangrado", "esfinter"],
+        "clinical_level": "intermediate"
+      }
+    },
+    {
+      "id": "colop_004",
+      "content": "El estreñimiento crónico se define como menos de 3 deposiciones por semana durante al menos 3 meses, con esfuerzo excesivo, heces duras o sensación de evacuación incompleta. Las causas incluyen dieta baja en fibra, deshidratación, sedentarismo, medicamentos y trastornos del piso pélvico. El manejo incluye cambios en el estilo de vida, aumento de fibra gradual, ejercicio regular y en casos refractarios, fisioterapia de biofeedback.",
+      "metadata": {
+        "source": "manual_coloproctologia.pdf",
+        "source_type": "pdf",
+        "page": 67,
+        "topic": "estrenimiento",
+        "gender_relevance": ["all"],
+        "problem_areas": ["abdomen", "pelvis"],
+        "keywords": ["estrenimiento", "deposiciones", "fibra", "heces", "duras"],
+        "clinical_level": "basic"
+      }
+    },
+    {
+      "id": "colop_005",
+      "content": "La enfermedad inflamatoria intestinal (EII) incluye la colitis ulcerosa y la enfermedad de Crohn. La colitis afecta solo el colon con inflamación continua, mientras que Crohn puede afectar cualquier parte del tracto digestivo con patrón discontinuo. Los síntomas incluyen diarrea crónica con sangre, dolor abdominal, pérdida de peso, fatiga y fiebre. Requiere manejo multidisciplinario con gastroenterología, cirugía colorrectal y nutrición.",
+      "metadata": {
+        "source": "manual_coloproctologia.pdf",
+        "source_type": "pdf",
+        "page": 89,
+        "topic": "enfermedad_inflamatoria",
+        "gender_relevance": ["all"],
+        "problem_areas": ["abdomen", "pelvis"],
+        "keywords": ["crohn", "colitis", "inflamatoria", "intestinal", "diarrea"],
+        "clinical_level": "advanced"
+      }
+    },
+    {
+      "id": "colop_006",
+      "content": "El cáncer colorrectal es el tercer cáncer más común mundialmente. Los factores de riesgo incluyen edad mayor de 50 años, historia familiar, pólipos adenomatosos, EII, obesidad, tabaquismo y dieta alta en carnes rojas. Los síntomas de alarma son cambio en hábitos intestinales, sangrado rectal persistente, dolor abdominal crónico, pérdida de peso inexplicable y anemia. La colonoscopia de detección debe iniciarse a los 45 años o antes si hay factores de riesgo.",
+      "metadata": {
+        "source": "manual_coloproctologia.pdf",
+        "source_type": "pdf",
+        "page": 112,
+        "topic": "cancer_colorrectal",
+        "gender_relevance": ["all"],
+        "problem_areas": ["abdomen", "pelvis"],
+        "keywords": ["cancer", "colorrectal", "colonoscopia", "polipos", "deteccion"],
+        "clinical_level": "advanced"
+      }
+    },
+    {
+      "id": "colop_007",
+      "content": "Los abscesos y fístulas perianales son complicaciones comunes en enfermedad de Crohn pero también ocurren de forma aislada. Un absceso es una colección de pus que causa dolor intenso, fiebre y masa palpable. Si no se trata, puede formar una fístula (túnel anormal entre el ano y la piel). El tratamiento de abscesos requiere drenaje quirúrgico urgente. Las fístulas complejas necesitan cirugía especializada y pueden requerir múltiples procedimientos.",
+      "metadata": {
+        "source": "manual_coloproctologia.pdf",
+        "source_type": "pdf",
+        "page": 134,
+        "topic": "abscesos_fistulas",
+        "gender_relevance": ["all"],
+        "problem_areas": ["pelvis"],
+        "keywords": ["absceso", "fistula", "perianal", "pus", "drenaje"],
+        "clinical_level": "advanced"
+      }
+    },
+    {
+      "id": "colop_008",
+      "content": "El síndrome del intestino irritable (SII) es un trastorno funcional caracterizado por dolor abdominal recurrente relacionado con la defecación, cambios en frecuencia o consistencia de heces, sin evidencia de daño estructural. Se clasifica en SII con predominio de diarrea, estreñimiento o mixto. El manejo incluye dieta baja en FODMAPs, manejo del estrés, probióticos específicos y medicamentos según el subtipo. No aumenta el riesgo de cáncer colorrectal.",
+      "metadata": {
+        "source": "manual_coloproctologia.pdf",
+        "source_type": "pdf",
+        "page": 156,
+        "topic": "intestino_irritable",
+        "gender_relevance": ["all"],
+        "problem_areas": ["abdomen"],
+        "keywords": ["intestino", "irritable", "SII", "dolor", "funcional", "fodmaps"],
+        "clinical_level": "intermediate"
+      }
+    }
+  ]
+}

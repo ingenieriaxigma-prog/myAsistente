@@ -1,0 +1,125 @@
+{
+  "specialty": "pelvic_floor",
+  "version": "1.0.0",
+  "updated_at": "2025-12-13T00:00:00Z",
+  "language": "es",
+  "metadata": {
+    "total_chunks": 8,
+    "sources": ["guia_clinica_piso_pelvico.pdf", "manual_incontinencia.pdf"],
+    "description": "Base de conocimiento sobre fisioterapia de piso pélvico, incontinencia urinaria y fecal, prolapsos y disfunciones sexuales"
+  },
+  "chunks": [
+    {
+      "id": "pelvic_001",
+      "content": "La incontinencia urinaria se define como la pérdida involuntaria de orina. Existen tres tipos principales: incontinencia de esfuerzo (pérdida de orina al toser, reír o hacer ejercicio), incontinencia de urgencia (necesidad súbita e incontrolable de orinar) e incontinencia mixta (combinación de ambas). Afecta principalmente a mujeres después del parto y a personas mayores de 60 años.",
+      "metadata": {
+        "source": "guia_clinica_piso_pelvico.pdf",
+        "source_type": "pdf",
+        "page": 12,
+        "topic": "incontinencia_urinaria",
+        "gender_relevance": ["female", "male", "all"],
+        "problem_areas": ["pelvis", "abdomen"],
+        "keywords": ["incontinencia", "orina", "esfuerzo", "urgencia", "pérdida"],
+        "clinical_level": "basic"
+      }
+    },
+    {
+      "id": "pelvic_002",
+      "content": "Los ejercicios de Kegel son la primera línea de tratamiento conservador para fortalecer el piso pélvico. Consisten en contraer los músculos que se usan para detener el flujo de orina durante 5-10 segundos, relajar por 10 segundos y repetir 10-15 veces, tres veces al día. Es crucial identificar correctamente los músculos sin contraer abdomen, glúteos o muslos.",
+      "metadata": {
+        "source": "manual_incontinencia.pdf",
+        "source_type": "pdf",
+        "page": 34,
+        "topic": "tratamiento_conservador",
+        "gender_relevance": ["all"],
+        "problem_areas": ["pelvis"],
+        "keywords": ["kegel", "ejercicios", "fortalecimiento", "tratamiento", "musculos"],
+        "clinical_level": "basic"
+      }
+    },
+    {
+      "id": "pelvic_003",
+      "content": "El prolapso de órganos pélvicos ocurre cuando los músculos y ligamentos del piso pélvico se debilitan, permitiendo que la vejiga, útero o recto desciendan hacia la vagina. Los síntomas incluyen sensación de bulto vaginal, presión pélvica, dificultad para vaciar la vejiga completamente y molestias durante las relaciones sexuales. Los factores de riesgo incluyen partos múltiples, obesidad, estreñimiento crónico y menopausia.",
+      "metadata": {
+        "source": "guia_clinica_piso_pelvico.pdf",
+        "source_type": "pdf",
+        "page": 45,
+        "topic": "prolapso",
+        "gender_relevance": ["female"],
+        "problem_areas": ["pelvis", "abdomen"],
+        "keywords": ["prolapso", "organos", "pelvicos", "descenso", "vagina"],
+        "clinical_level": "intermediate"
+      }
+    },
+    {
+      "id": "pelvic_004",
+      "content": "La incontinencia fecal se caracteriza por la pérdida involuntaria de heces sólidas o líquidas. Puede deberse a debilidad del esfínter anal, daño nervioso por partos traumáticos, cirugías rectales o enfermedades neurológicas. El tratamiento incluye modificaciones dietéticas, ejercicios de fortalecimiento del piso pélvico, biofeedback y en casos severos, cirugía reconstructiva.",
+      "metadata": {
+        "source": "manual_incontinencia.pdf",
+        "source_type": "pdf",
+        "page": 67,
+        "topic": "incontinencia_fecal",
+        "gender_relevance": ["all"],
+        "problem_areas": ["pelvis", "abdomen"],
+        "keywords": ["incontinencia", "fecal", "heces", "esfinter", "anal"],
+        "clinical_level": "intermediate"
+      }
+    },
+    {
+      "id": "pelvic_005",
+      "content": "El dolor pélvico crónico es aquel que persiste por más de 6 meses en la región entre el ombligo y las ingles. Las causas pueden ser múltiples: endometriosis, cistitis intersticial, síndrome del intestino irritable, disfunción muscular del piso pélvico o adherencias post-quirúrgicas. El abordaje debe ser multidisciplinario incluyendo fisioterapia especializada, manejo del dolor y apoyo psicológico.",
+      "metadata": {
+        "source": "guia_clinica_piso_pelvico.pdf",
+        "source_type": "pdf",
+        "page": 78,
+        "topic": "dolor_pelvico",
+        "gender_relevance": ["female", "male", "all"],
+        "problem_areas": ["pelvis", "abdomen", "back"],
+        "keywords": ["dolor", "cronico", "pelvico", "endometriosis", "cistitis"],
+        "clinical_level": "advanced"
+      }
+    },
+    {
+      "id": "pelvic_006",
+      "content": "La disfunción sexual relacionada con el piso pélvico incluye vaginismo (contracción involuntaria de músculos vaginales), dispareunia (dolor durante las relaciones) y dificultades orgásmicas. La fisioterapia de piso pélvico ha demostrado alta efectividad mediante técnicas de relajación muscular, dilatadores vaginales progresivos y terapia manual interna.",
+      "metadata": {
+        "source": "guia_clinica_piso_pelvico.pdf",
+        "source_type": "pdf",
+        "page": 92,
+        "topic": "disfuncion_sexual",
+        "gender_relevance": ["female"],
+        "problem_areas": ["pelvis"],
+        "keywords": ["vaginismo", "dispareunia", "sexual", "dolor", "relaciones"],
+        "clinical_level": "advanced"
+      }
+    },
+    {
+      "id": "pelvic_007",
+      "content": "Durante el embarazo y postparto, el piso pélvico sufre cambios significativos. El peso del útero grávido, los cambios hormonales y el trauma del parto vaginal pueden causar debilitamiento muscular. Se recomienda iniciar ejercicios de piso pélvico desde el primer trimestre, continuar en el postparto inmediato (tras 24-48 horas de parto sin complicaciones) y mantenerlos de por vida para prevención.",
+      "metadata": {
+        "source": "manual_incontinencia.pdf",
+        "source_type": "pdf",
+        "page": 103,
+        "topic": "embarazo_postparto",
+        "gender_relevance": ["female"],
+        "problem_areas": ["pelvis", "abdomen", "back"],
+        "keywords": ["embarazo", "postparto", "parto", "prevencion", "hormonal"],
+        "clinical_level": "intermediate"
+      }
+    },
+    {
+      "id": "pelvic_008",
+      "content": "El biofeedback es una técnica terapéutica que utiliza sensores para visualizar la actividad muscular del piso pélvico en tiempo real. Permite al paciente aprender a contraer y relajar correctamente estos músculos. Es especialmente útil en casos de hipertonía (músculos muy tensos) o cuando el paciente tiene dificultad para identificar los músculos correctos. La tasa de éxito aumenta significativamente cuando se combina con fisioterapia.",
+      "metadata": {
+        "source": "manual_incontinencia.pdf",
+        "source_type": "pdf",
+        "page": 118,
+        "topic": "biofeedback",
+        "gender_relevance": ["all"],
+        "problem_areas": ["pelvis"],
+        "keywords": ["biofeedback", "sensores", "muscular", "tecnica", "terapia"],
+        "clinical_level": "advanced"
+      }
+    }
+  ]
+}
