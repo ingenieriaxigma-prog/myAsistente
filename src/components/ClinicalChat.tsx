@@ -8,6 +8,7 @@ import { BackButton } from './common/BackButton';
 import { getRandomSuggestions } from '../constants/prompts';
 import { chatApi } from '../services/api';
 import { FormattedMessage } from './FormattedMessage';
+import { useAuth } from '../hooks/useAuth';
 
 interface ClinicalChatProps {
   specialty: Specialty;
@@ -16,6 +17,7 @@ interface ClinicalChatProps {
 
 export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
   const theme = useSpecialtyTheme(specialty);
+  const { session, loading: authLoading } = useAuth();
   
   // Helper function to copy text with fallback
   const copyToClipboard = async (text: string) => {
@@ -130,6 +132,8 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
   const [dislikedMessages, setDislikedMessages] = useState<Set<string>>(new Set());
   const [showSourcesForMessage, setShowSourcesForMessage] = useState<string | null>(null);
   const [regeneratingMessageId, setRegeneratingMessageId] = useState<string | null>(null);
+  const [chatError, setChatError] = useState<string | null>(null);
+  const [isSending, setIsSending] = useState(false);
   
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -142,31 +146,62 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
   const [deletingChatId, setDeletingChatId] = useState<string | null>(null);
   const [deleteToastMessage, setDeleteToastMessage] = useState<string | null>(null);
 
-  // Load chat history when sheet opens
+  // FIX: creación automática de chat + selección inicial + historial
   useEffect(() => {
-    const loadHistory = async () => {
-      if (showHistory) {
-        setIsLoadingHistory(true);
-        try {
-          const { chats } = await chatApi.getChatHistory();
-          const formattedHistory: ChatHistory[] = chats.map((chat: any) => ({
+    const loadOrCreateChat = async () => {
+      if (authLoading) return;
+      if (!session?.access_token) return;
+
+      setIsLoadingHistory(true);
+      try {
+        const { chats } = await chatApi.getChatHistory();
+        const formatted: ChatHistory[] = (chats || [])
+          .map((chat: any) => ({
             id: chat.id,
             title: chat.title,
-            date: new Date(chat.lastUpdate),
-          }));
-          setChatHistory(formattedHistory);
-        } catch (error) {
-          console.error('Error loading chat history:', error);
-        } finally {
-          setIsLoadingHistory(false);
+            date: new Date(chat.lastUpdate || chat.updatedAt || Date.now()),
+            specialty: chat.specialty,
+            lastUpdate: chat.lastUpdate || chat.updatedAt
+          }))
+          .filter((chat: any) => !specialty || chat.specialty === specialty)
+          .sort((a: ChatHistory, b: ChatHistory) => b.date.getTime() - a.date.getTime());
+
+        if (formatted.length === 0) {
+          const newChat = await chatApi.createChat(
+            specialty || 'general',
+            `Chat ${new Date().toLocaleDateString('es-ES')}`
+          );
+          if (newChat?.id) {
+            setCurrentChatId(newChat.id);
+            setChatHistory([{ ...newChat, date: new Date(newChat.lastUpdate || newChat.updatedAt || Date.now()) }]);
+            setChatError(null);
+          }
+          return;
         }
+
+        setChatHistory(formatted);
+        if (!currentChatId) {
+          setCurrentChatId(formatted[0].id);
+        }
+      } catch (error) {
+        console.error('Error loading or creating chat:', error);
+      } finally {
+        setIsLoadingHistory(false);
       }
     };
-    loadHistory();
-  }, [showHistory]);
+
+    loadOrCreateChat();
+  }, [authLoading, session, specialty]);
 
   const handleSendMessage = async () => {
-    if (!inputMessage.trim() || !currentChatId) return;
+    if (isSending) return;
+    if (!inputMessage.trim()) return;
+    if (!currentChatId) {
+      setChatError("Debes crear o seleccionar una conversación antes de enviar mensajes.");
+      return;
+    }
+    setChatError(null);
+    setIsSending(true);
 
     const userMessageContent = inputMessage;
     setInputMessage('');
@@ -247,16 +282,10 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
       console.error('Error sending message:', error);
       
       // Add error message
-      const errorMessage: Message = {
-        id: Date.now().toString(),
-        role: 'assistant',
-        content: 'Lo siento, hubo un error al procesar tu mensaje. Por favor intenta de nuevo.',
-        timestamp: new Date(),
-      };
-      
-      setMessages(prev => [...prev, errorMessage]);
+      setChatError(error instanceof Error ? error.message : 'Lo siento, hubo un error al procesar tu mensaje. Por favor intenta de nuevo.');
     } finally {
       setIsTyping(false);
+      setIsSending(false);
     }
   };
 
@@ -1313,6 +1342,11 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
 
       {/* Input Area */}
       <div className="p-4 border-t bg-white flex-shrink-0">
+        {chatError && (
+          <div className="mb-2 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+            {chatError}
+          </div>
+        )}
         <div className="flex gap-2 items-end">
           <div className="flex-1 relative">
             <textarea
@@ -1333,9 +1367,9 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
           </div>
           <button
             onClick={handleSendMessage}
-            disabled={!inputMessage.trim() || isTyping}
+            disabled={!inputMessage.trim() || isTyping || isSending || !currentChatId}
             className={`p-3 rounded-xl transition-colors ${
-              inputMessage.trim() && !isTyping
+              inputMessage.trim() && !isTyping && !isSending && currentChatId
                 ? `bg-gradient-to-br ${theme.gradient} text-white hover:opacity-90`
                 : 'bg-gray-200 text-gray-400'
             }`}

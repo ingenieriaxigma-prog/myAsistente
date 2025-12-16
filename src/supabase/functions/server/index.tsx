@@ -140,12 +140,21 @@ async function callOpenAI(messages: any[], hasAttachments: boolean = false) {
     const responseText = await response.text();
     
     if (!response.ok) {
+      const lowerBody = responseText.toLowerCase();
+      if (response.status === 429 || lowerBody.includes('rate_limit')) {
+        console.error(`❌ OpenAI API rate limit (${model})`);
+        return { error: 'RATE_LIMIT' };
+      }
+      if (lowerBody.includes('insufficient_quota') || lowerBody.includes('exceeded your current quota')) {
+        console.error(`❌ OpenAI API quota exceeded (${model})`);
+        return { error: 'INSUFFICIENT_QUOTA' };
+      }
       console.error(`❌ OpenAI API error (${model}):`, {
         status: response.status,
         statusText: response.statusText,
         body: responseText
       });
-      return null;
+      return { error: 'GENERIC', status: response.status };
     }
 
     const data = JSON.parse(responseText);
@@ -653,11 +662,17 @@ ${kbContext}
     });
 
     // Get AI response
-    const aiResponse = await callOpenAI(openaiMessages, hasAttachments);
+  const aiResponse = await callOpenAI(openaiMessages, hasAttachments);
 
-    if (!aiResponse) {
-      return c.json({ error: 'Failed to get AI response' }, 500);
-    }
+  if (aiResponse?.error === 'RATE_LIMIT') {
+    return c.json({ error: 'RATE_LIMIT', message: 'El asistente está ocupado por límite de solicitudes. Intenta de nuevo en unos segundos.' }, 429);
+  }
+  if (aiResponse?.error === 'INSUFFICIENT_QUOTA') {
+    return c.json({ error: 'INSUFFICIENT_QUOTA', message: 'Se agotó la cuota/créditos de OpenAI del proyecto. Agrega créditos o ajusta límites y vuelve a intentar.' }, 402);
+  }
+  if (!aiResponse || aiResponse.error) {
+    return c.json({ error: 'Failed to get AI response' }, 500);
+  }
 
     let aiContent = aiResponse.content;
     const modelUsed = aiResponse.model;
@@ -1089,40 +1104,48 @@ app.post("/make-server-baa51d6b/diagnosis/analyze", async (c) => {
     // 4. Search in Knowledge Base (use existing embedding function)
     const specialtyKey = specialty === 'MyColop' ? 'mycolop' : 'mypelvic';
     
-    // Generate embedding of the query
-    const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'text-embedding-3-small',
-        input: ragQuery
-      })
-    });
+    let chunks: any[] = [];
+    try {
+      // Generate embedding of the query
+      const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'text-embedding-3-small',
+          input: ragQuery
+        })
+      });
 
-    if (!embeddingResponse.ok) {
-      console.error('❌ Embedding API error:', await embeddingResponse.text());
-      throw new Error('Failed to generate embeddings');
-    }
-
-    const embeddingData = await embeddingResponse.json();
-    const queryEmbedding = embeddingData.data[0].embedding;
-
-    // Search for similar chunks
-    const { data: chunks, error: chunksError } = await supabase.rpc(
-      'match_document_chunks',
-      {
-        query_embedding: queryEmbedding,
-        match_threshold: 0.5,  // Lower threshold for diagnosis
-        match_count: 10,       // More context for diagnosis
-        filter_specialty: specialtyKey
+      if (!embeddingResponse.ok) {
+        console.error('❌ Embedding API error:', await embeddingResponse.text());
+        throw new Error('Embedding generation failed');
       }
-    );
 
-    if (chunksError) {
-      console.error('❌ Error searching chunks:', chunksError);
+      const embeddingData = await embeddingResponse.json();
+      const queryEmbedding = embeddingData.data[0].embedding;
+
+      // Search for similar chunks
+      const { data: chunkData, error: chunksError } = await supabase.rpc(
+        'match_document_chunks',
+        {
+          query_embedding: queryEmbedding,
+          match_threshold: 0.5,  // Lower threshold for diagnosis
+          match_count: 10,       // More context for diagnosis
+          filter_specialty: specialtyKey
+        }
+      );
+
+      if (chunksError) {
+        console.error('❌ Error searching chunks:', chunksError);
+      } else if (chunkData) {
+        chunks = chunkData;
+      }
+    } catch (ragError) {
+      console.error('⚠️ RAG disabled due to embedding/search error:', ragError);
+      chunks = [];
     }
 
     console.log('📚 RAG chunks found:', chunks?.length || 0);

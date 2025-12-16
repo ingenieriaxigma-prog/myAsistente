@@ -305,7 +305,7 @@ export const chatApi = {
     if (!response.ok) {
       const errorData = await response.json();
       console.error('❌ Error sending message:', errorData);
-      throw new Error(errorData.error || 'Failed to send message');
+      throw new Error(errorData.message || errorData.error || 'Failed to send message');
     }
 
     const data = await response.json();
