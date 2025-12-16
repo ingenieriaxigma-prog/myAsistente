@@ -3,12 +3,12 @@ import { ChevronLeft, Download, Mic, Image, Send, Menu, Plus, MessageCircle, Spa
 import type { Specialty, Message, Attachment, ChatHistory } from '../types';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from './ui/sheet';
 import { useSpecialtyTheme } from '../hooks/useSpecialtyTheme';
-import { ScreenContainer } from './common/ScreenContainer';
 import { BackButton } from './common/BackButton';
 import { getRandomSuggestions } from '../constants/prompts';
 import { chatApi } from '../services/api';
 import { FormattedMessage } from './FormattedMessage';
 import { useAuth } from '../hooks/useAuth';
+import { AppShell, AppHeader, AppFooter } from './layout';
 
 interface ClinicalChatProps {
   specialty: Specialty;
@@ -95,26 +95,6 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
     setCurrentChatId(null);
   }, [welcomeMessage]);
   
-  // Create new chat on component mount
-  useEffect(() => {
-    const initChat = async () => {
-      try {
-        const { chat } = await chatApi.createChat(
-          specialty || 'MyPelvic',
-          `Chat ${new Date().toLocaleDateString('es-ES')}`
-        );
-        setCurrentChatId(chat.id);
-        console.log('New chat created:', chat.id);
-      } catch (error) {
-        console.error('Error creating chat:', error);
-      }
-    };
-    
-    if (specialty && !currentChatId) {
-      initChat();
-    }
-  }, [specialty, currentChatId]);
-  
   const [inputMessage, setInputMessage] = useState('');
   const [showHistory, setShowHistory] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -140,66 +120,90 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const lastUserMessageRef = useRef<HTMLDivElement | null>(null);
   
   const [chatHistory, setChatHistory] = useState<ChatHistory[]>([]);
-  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [deletingChatId, setDeletingChatId] = useState<string | null>(null);
   const [deleteToastMessage, setDeleteToastMessage] = useState<string | null>(null);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
-  // FIX: creación automática de chat + selección inicial + historial
-  useEffect(() => {
-    const loadOrCreateChat = async () => {
-      if (authLoading) return;
-      if (!session?.access_token) return;
+  // Helper para cargar mensajes de un chat sin alterar otros estados de UI
+  const loadChatMessages = async (chatId: string) => {
+    try {
+      const { chat } = await chatApi.getChat(chatId);
+      setCurrentChatId(chat.id);
+      const formattedMessages: Message[] = chat.messages.map((msg: any) => ({
+        id: msg.id,
+        role: msg.role,
+        content: msg.content,
+        timestamp: new Date(msg.timestamp),
+        attachments: msg.attachments,
+      }));
+      setMessages(formattedMessages);
+    } catch (error) {
+      console.error('Error loading chat messages:', error);
+    }
+  };
 
-      setIsLoadingHistory(true);
-      try {
-        const { chats } = await chatApi.getChatHistory();
-        const formatted: ChatHistory[] = (chats || [])
-          .map((chat: any) => ({
-            id: chat.id,
-            title: chat.title,
-            date: new Date(chat.lastUpdate || chat.updatedAt || Date.now()),
-            specialty: chat.specialty,
-            lastUpdate: chat.lastUpdate || chat.updatedAt
-          }))
-          .filter((chat: any) => !specialty || chat.specialty === specialty)
-          .sort((a: ChatHistory, b: ChatHistory) => b.date.getTime() - a.date.getTime());
-
-        if (formatted.length === 0) {
-          const newChat = await chatApi.createChat(
-            specialty || 'general',
-            `Chat ${new Date().toLocaleDateString('es-ES')}`
-          );
-          if (newChat?.id) {
-            setCurrentChatId(newChat.id);
-            setChatHistory([{ ...newChat, date: new Date(newChat.lastUpdate || newChat.updatedAt || Date.now()) }]);
-            setChatError(null);
-          }
-          return;
-        }
-
-        setChatHistory(formatted);
-        if (!currentChatId) {
-          setCurrentChatId(formatted[0].id);
-        }
-      } catch (error) {
-        console.error('Error loading or creating chat:', error);
-      } finally {
-        setIsLoadingHistory(false);
+  const ensureActiveChat = async (): Promise<string | null> => {
+    if (currentChatId) return currentChatId;
+    try {
+      const { chat } = await chatApi.createChat(
+        specialty || 'general',
+        `Chat ${new Date().toLocaleDateString('es-ES')}`
+      );
+      if (!chat?.id) {
+        throw new Error('No se pudo crear el chat');
       }
-    };
+      setCurrentChatId(chat.id);
+      await reloadHistory();
+      return chat.id;
+    } catch (err) {
+      console.error('Error ensuring active chat:', err);
+      setChatError('No se pudo crear el chat. Intenta nuevamente.');
+      return null;
+    }
+  };
 
-    loadOrCreateChat();
+  const reloadHistory = async () => {
+    setIsLoadingHistory(true);
+    try {
+      const { chats } = await chatApi.getChatHistory();
+      const formatted: ChatHistory[] = (chats || [])
+        .map((chat: any) => ({
+          id: chat.id,
+          title: chat.title,
+          date: new Date(chat.lastUpdate || chat.updatedAt || Date.now()),
+          specialty: chat.specialty,
+          lastUpdate: chat.lastUpdate || chat.updatedAt
+        }))
+        .filter((chat: any) => !specialty || chat.specialty === specialty)
+        .sort((a: ChatHistory, b: ChatHistory) => b.date.getTime() - a.date.getTime());
+
+      setChatHistory(formatted);
+      if (formatted.length > 0 && !currentChatId) {
+        // Seleccionar el más reciente y cargar mensajes para evitar estado "nuevo chat"
+        await loadChatMessages(formatted[0].id);
+      }
+      return formatted;
+    } catch (error) {
+      console.error('Error loading history:', error);
+      return [];
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  useEffect(() => {
+    if (authLoading || !session?.access_token) return;
+    void reloadHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, session, specialty]);
 
   const handleSendMessage = async () => {
     if (isSending) return;
     if (!inputMessage.trim()) return;
-    if (!currentChatId) {
-      setChatError("Debes crear o seleccionar una conversación antes de enviar mensajes.");
-      return;
-    }
     setChatError(null);
     setIsSending(true);
 
@@ -222,6 +226,12 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
     };
 
     setMessages(prev => [...prev, tempUserMessage]);
+    requestAnimationFrame(() => {
+      lastUserMessageRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+    });
     setPendingAttachments([]);
     setIsTyping(true);
 
@@ -234,9 +244,13 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
         base64Prefix: a.base64 ? a.base64.substring(0, 50) : 'none'
       })));
       
-      // Send message to backend and get AI response
+      const chatIdToUse = await ensureActiveChat();
+      if (!chatIdToUse) {
+        throw new Error('No se pudo crear el chat');
+      }
+
       const { userMessage, aiMessage, chat, rag } = await chatApi.sendMessage(
-        currentChatId,
+        chatIdToUse,
         userMessageContent,
         pendingAttachments.length > 0 ? pendingAttachments : undefined
       );
@@ -251,7 +265,6 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
 
       // Update messages with backend response
       setMessages(prev => {
-        // Remove temp user message and add both messages from backend
         const withoutTemp = prev.filter(m => m.id !== tempUserMessage.id);
         return [
           ...withoutTemp,
@@ -262,7 +275,6 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
           {
             ...aiMessage,
             timestamp: new Date(aiMessage.timestamp),
-            // Add RAG metadata to the message if available
             metadata: aiMessage.metadata || (rag?.enabled ? { rag } : undefined),
           },
         ];
@@ -272,12 +284,13 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
       if (chat && chat.title) {
         console.log('Updating chat title in history:', chat.title);
         setChatHistory(prev => prev.map(c => 
-          c.id === currentChatId 
+          c.id === chatIdToUse 
             ? { ...c, title: chat.title, date: new Date(chat.lastUpdate) }
             : c
         ));
       }
 
+      await reloadHistory();
     } catch (error) {
       console.error('Error sending message:', error);
       
@@ -546,24 +559,8 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
   };
 
   const handleChatSelect = async (chatId: string) => {
-    try {
-      const { chat } = await chatApi.getChat(chatId);
-      setCurrentChatId(chat.id);
-      
-      // Convert chat messages to Message format
-      const formattedMessages: Message[] = chat.messages.map((msg: any) => ({
-        id: msg.id,
-        role: msg.role,
-        content: msg.content,
-        timestamp: new Date(msg.timestamp),
-        attachments: msg.attachments,
-      }));
-      
-      setMessages(formattedMessages);
-      setShowHistory(false);
-    } catch (error) {
-      console.error('Error loading chat:', error);
-    }
+    await loadChatMessages(chatId);
+    setShowHistory(false);
   };
 
   const handleDeleteChat = async (chatId: string) => {
@@ -586,7 +583,13 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
           specialty || 'MyPelvic',
           `Chat ${new Date().toLocaleDateString('es-ES')}`
         );
-        setCurrentChatId(chat.id);
+        if (chat?.id) {
+          setCurrentChatId(chat.id);
+          setChatHistory(prev => [{ ...chat, date: new Date(chat.updatedAt || chat.lastUpdate || Date.now()) }, ...prev]);
+        } else {
+          console.error('No se pudo crear un chat nuevo tras eliminar');
+          setChatError('No se pudo crear un chat nuevo tras eliminar.');
+        }
         setMessages([
           {
             id: '1',
@@ -619,7 +622,12 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
         specialty || 'MyPelvic',
         `Chat ${new Date().toLocaleDateString('es-ES')}`
       );
+      if (!chat?.id) {
+        throw new Error('No se pudo crear el chat');
+      }
       setCurrentChatId(chat.id);
+      setChatHistory(prev => [{ ...chat, date: new Date(chat.updatedAt || chat.lastUpdate || Date.now()) }, ...prev]);
+      await reloadHistory();
       setMessages([
         {
           id: '1',
@@ -631,6 +639,7 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
       setShowHistory(false);
     } catch (error) {
       console.error('Error creating new chat:', error);
+      setChatError('No se pudo crear el chat. Intenta nuevamente.');
     }
   };
 
@@ -850,563 +859,478 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
     }
   };
 
-  return (
-    <ScreenContainer>
-      {/* Header - Sticky para mantenerlo visible */}
-      <div className={`sticky top-0 z-10 bg-gradient-to-br ${theme.gradient} p-4 flex items-center gap-3 text-white flex-shrink-0`}>
-        <BackButton onClick={onBack} variant="white" />
-        <div className="flex-1 flex items-center gap-2">
-          <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
-            <MessageCircle className="w-5 h-5" />
-          </div>
-          <div className="flex-1">
-            <h1 className="font-semibold">Chat Clínico</h1>
-            <p className="text-xs text-white/80">Asistente especializado</p>
-          </div>
-        </div>
+  const headerContent = (
+    <AppHeader
+      left={<BackButton onClick={onBack} variant="dark" />}
+      title="Chat Clínico"
+      right={
         <button 
           onClick={() => setShowHistory(true)}
-          className="w-10 h-10 flex items-center justify-center hover:bg-white/10 rounded-lg transition-colors"
+          className="w-10 h-10 flex items-center justify-center rounded-lg transition-colors hover:bg-gray-100 text-gray-600"
         >
           <Menu className="w-5 h-5" />
         </button>
-      </div>
+      }
+    />
+  );
 
-      {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div className={`max-w-[80%] ${message.role === 'user' ? 'order-2' : 'order-1'}`}>
-              <div
-                className={`rounded-2xl p-4 ${
-                  message.role === 'user'
-                    ? `bg-gradient-to-br ${theme.gradient} text-white`
-                    : 'bg-gray-100 text-gray-800'
-                }`}
-              >
-                {message.attachments && message.attachments.length > 0 && (
-                  <div className="mb-3 space-y-2">
-                    {message.attachments.map((attachment, idx) => (
-                      <div
-                        key={idx}
-                        className={`rounded-lg overflow-hidden ${
-                          message.role === 'user' ? 'bg-white/10' : 'bg-white'
-                        }`}
-                      >
-                        {attachment.type === 'image' ? (
-                          <div className="relative">
-                            <img 
-                              src={attachment.url || attachment.base64 || (attachment as any).data_url} 
-                              alt={attachment.name}
-                              className="w-full max-w-xs rounded-lg"
-                            />
-                            <div className={`mt-1 px-2 py-1 text-xs ${
-                              message.role === 'user' ? 'text-white/70' : 'text-gray-500'
-                            }`}>
-                              <Image className="w-3 h-3 inline mr-1" />
-                              {attachment.name}
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2 p-2">
-                            {attachment.type === 'file' && <FileText className="w-4 h-4" />}
-                            {attachment.type === 'audio' && <Volume2 className="w-4 h-4" />}
-                            <span className="text-sm flex-1 truncate">{attachment.name}</span>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <FormattedMessage content={message.content} isUser={message.role === 'user'} />
-                <p className={`text-xs mt-2 ${message.role === 'user' ? 'text-white/70' : 'text-gray-500'}`}>
-                  {message.timestamp.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-                </p>
-                {/* Show AI model badge for assistant messages */}
-                {message.role === 'assistant' && message.model && (
-                  <div className="mt-2 flex items-center gap-1.5">
-                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-full border border-purple-200/30">
-                      <Sparkles className="w-3 h-3 text-purple-600" />
-                      <span className="text-xs font-medium text-purple-700">
-                        xigma
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-              
-              {/* Message actions for assistant messages */}
-              {message.role === 'assistant' && (
-                <div className="flex gap-1 mt-2 ml-2">
-                  <button
-                    onClick={() => speakText(message.content, message.id)}
-                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                    title={speakingMessageId === message.id ? 'Detener' : 'Escuchar'}
-                  >
-                    {speakingMessageId === message.id ? (
-                      <Pause className="w-4 h-4 text-gray-600" />
-                    ) : (
-                      <Volume2 className="w-4 h-4 text-gray-600" />
-                    )}
-                  </button>
-                  <button
-                    onClick={() => handleCopyMessage(message.id, message.content)}
-                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                    title="Copiar"
-                  >
-                    {copiedMessageId === message.id ? (
-                      <Check className="w-4 h-4 text-green-600" />
-                    ) : (
-                      <Copy className="w-4 h-4 text-gray-600" />
-                    )}
-                  </button>
-                  <button
-                    onClick={() => handleLikeMessage(message.id)}
-                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                    title="Me gusta"
-                  >
-                    <ThumbsUp className={`w-4 h-4 ${
-                      likedMessages.has(message.id) ? 'text-blue-600 fill-blue-600' : 'text-gray-600'
-                    }`} />
-                  </button>
-                  <button
-                    onClick={() => handleDislikeMessage(message.id)}
-                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                    title="No me gusta"
-                  >
-                    <ThumbsDown className={`w-4 h-4 ${
-                      dislikedMessages.has(message.id) ? 'text-red-600 fill-red-600' : 'text-gray-600'
-                    }`} />
-                  </button>
-                  <button
-                    onClick={() => handleShareMessage(message.content)}
-                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                    title="Compartir"
-                  >
-                    <Share className="w-4 h-4 text-gray-600" />
-                  </button>
-                  <button
-                    onClick={() => handleRegenerateResponse(message.id)}
-                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                    title="Regenerar respuesta"
-                    disabled={regeneratingMessageId === message.id}
-                  >
-                    {regeneratingMessageId === message.id ? (
-                      <Loader2 className="w-4 h-4 text-gray-600 animate-spin" />
-                    ) : (
-                      <RefreshCw className="w-4 h-4 text-gray-600" />
-                    )}
-                  </button>
-                  {/* ALWAYS show "Ver fuentes" button for ALL assistant messages */}
-                  <button
-                    onClick={() => toggleSources(message.id)}
-                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                    title="Ver fuentes"
-                  >
-                    <Globe className={`w-4 h-4 ${
-                      showSourcesForMessage === message.id ? 'text-blue-600' : 'text-gray-600'
-                    }`} />
-                  </button>
-                </div>
-              )}
-              
-              {/* Sources panel - ALWAYS show when clicked */}
-              {message.role === 'assistant' && showSourcesForMessage === message.id && (() => {
-                // Get RAG sources from message metadata
-                const ragSources = message.metadata?.sources || message.metadata?.rag?.chunks || [];
-                const actuallyUsedSources = message.metadata?.actually_used_sources === true;
-                const hasRagSources = ragSources.length > 0 && actuallyUsedSources;
-                const modelUsed = message.model || 'gpt-4o-mini';
-                // 🔥 VISUAL: Mostrar "xigma" en lugar del modelo técnico real
-                const modelDisplayName = 'xigma';
-                
-                return (
-                  <div className="mt-3 ml-2 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Globe className="w-4 h-4 text-blue-600" />
-                      <h4 className="font-medium text-blue-900">
-                        Referencias Bibliográficas
-                      </h4>
-                    </div>
-                    
-                    {hasRagSources ? (
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-                          <div className="flex-shrink-0 w-2 h-2 bg-green-500 rounded-full"></div>
-                          <p className="text-sm text-green-900">
-                            <strong>Fuente:</strong> Base de Conocimiento Médica de <strong>{specialty}</strong>
-                          </p>
-                        </div>
-                        
-                        <p className="text-sm text-blue-800">
-                          Se encontraron <strong>{ragSources.length} referencias relevantes</strong> en nuestra base de datos especializada.
-                        </p>
-                        
-                        <div className="space-y-2">
-                          {ragSources.map((source: any, idx: number) => {
-                            const similarity = source.similarity || 0;
-                            const percentage = Math.round(similarity * 100);
-                            
-                            let badgeColor = 'bg-gray-100 text-gray-700';
-                            let barColor = 'bg-gray-400';
-                            if (percentage >= 85) {
-                              badgeColor = 'bg-green-100 text-green-700';
-                              barColor = 'bg-green-500';
-                            } else if (percentage >= 70) {
-                              badgeColor = 'bg-blue-100 text-blue-700';
-                              barColor = 'bg-blue-500';
-                            } else if (percentage >= 50) {
-                              badgeColor = 'bg-yellow-100 text-yellow-700';
-                              barColor = 'bg-yellow-500';
-                            }
-                            
-                            return (
-                              <div key={idx} className="p-3 bg-white border border-blue-200 rounded-lg">
-                                <div className="flex items-center justify-between mb-2">
-                                  <span className="text-xs font-medium text-blue-900">
-                                    Fuente {source.index || idx + 1}
-                                  </span>
-                                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${badgeColor}`}>
-                                    Relevancia: {percentage}%
-                                  </span>
-                                </div>
-                                
-                                <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden mb-2">
-                                  <div 
-                                    className={`h-full ${barColor} transition-all duration-500`}
-                                    style={{ width: `${percentage}%` }}
-                                  />
-                                </div>
-                                
-                                {source.preview && (
-                                  <p className="text-xs text-gray-700 mt-2 italic line-clamp-3">
-                                    "{source.preview}"
-                                  </p>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                        
-                        <div className="mt-3 p-3 bg-blue-100 border border-blue-300 rounded-lg">
-                          <p className="text-xs text-blue-800">
-                            <strong>📚 Información:</strong> Estas fuentes provienen de nuestra base de conocimiento médica especializada, actualizada regularmente con literatura científica y guías clínicas.
-                          </p>
-                        </div>
-                        
-                        <div className="flex items-center gap-2 text-xs text-gray-600">
-                          <Sparkles className="w-3 h-3 text-purple-600" />
-                          <span>Modelo: <strong>{modelDisplayName}</strong></span>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-2 p-3 bg-purple-50 border border-purple-200 rounded-lg">
-                          <div className="flex-shrink-0 w-2 h-2 bg-purple-500 rounded-full"></div>
-                          <p className="text-sm text-purple-900">
-                            <strong>Fuente:</strong> Conocimiento Médico General <strong>{modelDisplayName}</strong>
-                          </p>
-                        </div>
-                        
-                        <p className="text-sm text-blue-800">
-                          Esta respuesta se basa en el conocimiento médico general entrenado en el modelo de IA, que incluye información de fuentes médicas confiables hasta su última actualización.
-                        </p>
-                        
-                        <div className="mt-3 space-y-2">
-                          <p className="text-xs font-medium text-blue-900">El modelo se entrenó con información de:</p>
-                          <ul className="list-disc list-inside space-y-1 ml-2 text-xs text-blue-800">
-                            <li>Guías clínicas internacionales</li>
-                            <li>Literatura médica revisada por pares</li>
-                            <li>Protocolos de práctica clínica</li>
-                            <li>Bases de datos médicas especializadas</li>
-                          </ul>
-                        </div>
-                        
-                        <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                          <p className="text-xs text-amber-800">
-                            <strong>💡 Nota:</strong> Esta información es educativa y de referencia general. Para información específica de {specialty}, recomendamos consultar con un profesional de la salud.
-                          </p>
-                        </div>
-                        
-                        <div className="flex items-center gap-2 text-xs text-gray-600">
-                          <Sparkles className="w-3 h-3 text-purple-600" />
-                          <span>Modelo: <strong>{modelDisplayName}</strong></span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
-        ))}
-        
-        {isTyping && (
-          <div className="flex justify-start">
-            <div className="bg-gray-100 rounded-2xl p-4">
-              <div className="flex gap-1">
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Quick suggestions - only show when there are no messages */}
-      {messages.length === 1 && (
-        <div className="px-4 pb-3">
-          <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4">
-            {(getRandomSuggestions(specialty) || []).map((suggestion, idx) => (
-              <button
-                key={idx}
-                onClick={() => {
-                  // Set the message and send it automatically
-                  setInputMessage(suggestion);
-                  // Use setTimeout to ensure state is updated before sending
-                  setTimeout(() => {
-                    // Simulate clicking send by calling handleSendMessage with the suggestion
-                    const sendSuggestion = async () => {
-                      if (!currentChatId) return;
-                      
-                      setInputMessage('');
-                      
-                      // Reset textarea height
-                      const textarea = document.querySelector('textarea');
-                      if (textarea) {
-                        textarea.style.height = 'auto';
-                      }
-                      
-                      // Add user message to UI immediately
-                      const tempUserMessage: Message = {
-                        id: Date.now().toString(),
-                        role: 'user',
-                        content: suggestion,
-                        timestamp: new Date(),
-                      };
-                      
-                      setMessages(prev => [...prev, tempUserMessage]);
-                      setIsTyping(true);
-                      
-                      try {
-                        // Send message to backend and get AI response
-                        const { userMessage, aiMessage, chat } = await chatApi.sendMessage(
-                          currentChatId,
-                          suggestion
-                        );
-                        
-                        // Update messages with backend response
-                        setMessages(prev => {
-                          // Remove temp user message and add both messages from backend
-                          const withoutTemp = prev.filter(m => m.id !== tempUserMessage.id);
-                          return [
-                            ...withoutTemp,
-                            {
-                              ...userMessage,
-                              timestamp: new Date(userMessage.timestamp),
-                            },
-                            {
-                              ...aiMessage,
-                              timestamp: new Date(aiMessage.timestamp),
-                            },
-                          ];
-                        });
-
-                        // If the chat title was updated (auto-generated), update the history
-                        if (chat && chat.title) {
-                          console.log('Updating chat title in history from suggestion:', chat.title);
-                          setChatHistory(prev => prev.map(c => 
-                            c.id === currentChatId 
-                              ? { ...c, title: chat.title, date: new Date(chat.lastUpdate) }
-                              : c
-                          ));
-                        }
-                      } catch (error) {
-                        console.error('Error sending message:', error);
-                        
-                        // Add error message
-                        const errorMessage: Message = {
-                          id: Date.now().toString(),
-                          role: 'assistant',
-                          content: 'Lo siento, hubo un error al procesar tu mensaje. Por favor intenta de nuevo.',
-                          timestamp: new Date(),
-                        };
-                        
-                        setMessages(prev => [...prev, errorMessage]);
-                      } finally {
-                        setIsTyping(false);
-                      }
-                    };
-                    
-                    sendSuggestion();
-                  }, 0);
-                }}
-                className={`flex-shrink-0 px-4 py-2 rounded-full border-2 ${
-                  specialty === 'MyPelvic'
-                    ? 'border-teal-500 text-teal-700 hover:bg-teal-50'
-                    : 'border-blue-500 text-blue-700 hover:bg-blue-50'
-                } transition-colors text-sm whitespace-nowrap`}
-              >
-                {suggestion}
-              </button>
-            ))}
-          </div>
+  const footerContent = (
+    <div className="p-0">
+      {chatError && (
+        <div className="mb-2 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+          {chatError}
         </div>
       )}
-
-      {/* Pending attachments */}
-      {pendingAttachments.length > 0 && (
-        <div className="px-4 pb-2">
-          <div className="flex gap-2 overflow-x-auto">
-            {pendingAttachments.map((attachment, idx) => (
-              <div
-                key={idx}
-                className="flex-shrink-0 relative"
-              >
-                {attachment.type === 'image' ? (
-                  <div className="relative">
-                    <img 
-                      src={attachment.url} 
-                      alt={attachment.name}
-                      className="h-20 w-20 object-cover rounded-lg border-2 border-gray-300"
-                    />
-                    <button 
-                      onClick={() => removeAttachment(idx)}
-                      className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 bg-gray-100 px-3 py-2 rounded-lg">
-                    {attachment.type === 'file' && <FileText className="w-4 h-4" />}
-                    {attachment.type === 'audio' && <Volume2 className="w-4 h-4" />}
-                    <span className="text-sm max-w-[120px] truncate">{attachment.name}</span>
-                    <button onClick={() => removeAttachment(idx)}>
-                      <X className="w-4 h-4 text-gray-500 hover:text-gray-700" />
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Audio Recorder */}
-      {showAudioRecorder && (
-        <div className="px-4 pb-2">
-          <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 flex items-center gap-3">
-            <div className="flex-1 flex items-center gap-3">
-              <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-              <span className="text-red-700 font-medium">
-                {isRecording ? `Grabando ${formatRecordingTime(recordingTime)}` : 'Preparando...'}
-              </span>
-            </div>
-            <div className="flex gap-2">
-              {!isRecording ? (
-                <button
-                  onClick={startRecording}
-                  className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-                >
-                  Iniciar
-                </button>
-              ) : (
-                <button
-                  onClick={stopRecording}
-                  className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors"
-                >
-                  Detener
-                </button>
-              )}
-              <button
-                onClick={() => {
-                  stopRecording();
-                  setShowAudioRecorder(false);
-                }}
-                className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-          {microphoneError && (
-            <p className="text-red-600 text-sm mt-2">{microphoneError}</p>
-          )}
-        </div>
-      )}
-
-      {/* Input Area */}
-      <div className="p-4 border-t bg-white flex-shrink-0">
-        {chatError && (
-          <div className="mb-2 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
-            {chatError}
-          </div>
-        )}
-        <div className="flex gap-2 items-end">
-          <div className="flex-1 relative">
-            <textarea
-              value={inputMessage}
-              onChange={handleTextareaChange}
-              onKeyDown={handleKeyDown}
-              placeholder="Escribe tu mensaje..."
-              className="w-full px-4 py-3 pr-10 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none overflow-y-auto"
-              style={{ minHeight: '48px', maxHeight: '120px' }}
-              rows={1}
-            />
-            <button
-              onClick={() => setShowAttachMenu(!showAttachMenu)}
-              className="absolute right-2 bottom-3 p-1 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <Plus className="w-5 h-5 text-gray-400" />
-            </button>
-          </div>
+      <div className="flex gap-2 items-end">
+        <div className="flex-1 relative">
+          <textarea
+            value={inputMessage}
+            onChange={handleTextareaChange}
+            onKeyDown={handleKeyDown}
+            placeholder="Escribe tu mensaje..."
+            className="w-full px-4 py-3 pr-10 rounded-xl border border-gray-200 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none overflow-y-auto"
+            style={{ minHeight: '48px', maxHeight: '120px', zIndex: 10 }}
+            rows={1}
+          />
           <button
-            onClick={handleSendMessage}
-            disabled={!inputMessage.trim() || isTyping || isSending || !currentChatId}
-            className={`p-3 rounded-xl transition-colors ${
-              inputMessage.trim() && !isTyping && !isSending && currentChatId
-                ? `bg-gradient-to-br ${theme.gradient} text-white hover:opacity-90`
-                : 'bg-gray-200 text-gray-400'
-            }`}
+            onClick={() => setShowAttachMenu(!showAttachMenu)}
+            className="absolute right-2 bottom-3 p-1 hover:bg-gray-100 rounded-lg transition-colors"
           >
-            <Send className="w-5 h-5" />
+            <Plus className="w-5 h-5 text-gray-400" />
           </button>
         </div>
-        
-        {/* Attach menu */}
-        {showAttachMenu && (
-          <div className="mt-2 flex gap-2">
-            <button
-              onClick={() => imageInputRef.current?.click()}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+        <button
+          onClick={handleSendMessage}
+          disabled={!inputMessage.trim() || isTyping || isSending}
+          className={`p-3 rounded-xl transition-colors ${
+            inputMessage.trim() && !isTyping && !isSending
+              ? `bg-gradient-to-br ${theme.gradient} text-white hover:opacity-90`
+              : 'bg-gray-200 text-gray-400'
+          }`}
+        >
+          <Send className="w-5 h-5" />
+        </button>
+      </div>
+      
+      {showAttachMenu && (
+        <div className="mt-2 flex gap-2">
+          <button
+            onClick={() => imageInputRef.current?.click()}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+          >
+            <Image className="w-4 h-4" />
+            <span className="text-sm">Imagen</span>
+          </button>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+          >
+            <FileText className="w-4 h-4" />
+            <span className="text-sm">Archivo</span>
+          </button>
+          <button
+            onClick={handleVoiceInput}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+          >
+            <Mic className="w-4 h-4" />
+            <span className="text-sm">Audio</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <AppShell header={headerContent} footer={<AppFooter>{footerContent}</AppFooter>}>
+      <div className="flex-1 flex flex-col overflow-hidden w-full md:max-w-[720px] lg:max-w-[800px] mx-auto">
+        {/* Messages Area */}
+        <div
+          className="flex-1 overflow-y-auto p-4 space-y-4"
+          ref={messagesContainerRef}
+        >
+          {messages.map((message) => (
+            <div
+              key={message.id}
+              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              ref={message.role === 'user' ? lastUserMessageRef : undefined}
             >
-              <Image className="w-4 h-4" />
-              <span className="text-sm">Imagen</span>
-            </button>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-            >
-              <FileText className="w-4 h-4" />
-              <span className="text-sm">Archivo</span>
-            </button>
-            <button
-              onClick={handleVoiceInput}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-            >
-              <Mic className="w-4 h-4" />
-              <span className="text-sm">Audio</span>
-            </button>
+              <div className={`max-w-[80%] ${message.role === 'user' ? 'order-2' : 'order-1'}`}>
+                <div
+                  className={`rounded-2xl p-4 ${
+                    message.role === 'user'
+                      ? `bg-gradient-to-br ${theme.gradient} text-white`
+                      : 'bg-gray-100 text-gray-800'
+                  }`}
+                >
+                  {message.attachments && message.attachments.length > 0 && (
+                    <div className="mb-3 space-y-2">
+                      {message.attachments.map((attachment, idx) => (
+                        <div
+                          key={idx}
+                          className={`rounded-lg overflow-hidden ${
+                            message.role === 'user' ? 'bg-white/10' : 'bg-white'
+                          }`}
+                        >
+                          {attachment.type === 'image' ? (
+                            <div className="relative">
+                              <img 
+                                src={attachment.url || attachment.base64 || (attachment as any).data_url} 
+                                alt={attachment.name}
+                                className="w-full max-w-xs rounded-lg"
+                              />
+                              <div className={`mt-1 px-2 py-1 text-xs ${
+                                message.role === 'user' ? 'text-white/70' : 'text-gray-500'
+                              }`}>
+                                <Image className="w-3 h-3 inline mr-1" />
+                                {attachment.name}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 p-2">
+                              {attachment.type === 'file' && <FileText className="w-4 h-4" />}
+                              {attachment.type === 'audio' && <Volume2 className="w-4 h-4" />}
+                              <span className="text-sm flex-1 truncate">{attachment.name}</span>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <FormattedMessage content={message.content} isUser={message.role === 'user'} />
+                  <p className={`text-xs mt-2 ${message.role === 'user' ? 'text-white/70' : 'text-gray-500'}`}>
+                    {message.timestamp.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                  {message.role === 'assistant' && message.model && (
+                    <div className="mt-2 flex items-center gap-1.5">
+                      <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-full border border-purple-200/30">
+                        <Sparkles className="w-3 h-3 text-purple-600" />
+                        <span className="text-xs font-medium text-purple-700">
+                          xigma
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {message.role === 'assistant' && (
+                  <div className="flex gap-1 mt-2 ml-2">
+                    <button
+                      onClick={() => speakText(message.content, message.id)}
+                      className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                      title={speakingMessageId === message.id ? 'Detener' : 'Escuchar'}
+                    >
+                      {speakingMessageId === message.id ? (
+                        <Pause className="w-4 h-4 text-gray-600" />
+                      ) : (
+                        <Volume2 className="w-4 h-4 text-gray-600" />
+                      )}
+                    </button>
+                    <button
+                      onClick={() => handleCopyMessage(message.id, message.content)}
+                      className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                      title="Copiar"
+                    >
+                      {copiedMessageId === message.id ? (
+                        <Check className="w-4 h-4 text-green-600" />
+                      ) : (
+                        <Copy className="w-4 h-4 text-gray-600" />
+                      )}
+                    </button>
+                    <button
+                      onClick={() => handleLikeMessage(message.id)}
+                      className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                      title="Me gusta"
+                    >
+                      <ThumbsUp className={`w-4 h-4 ${
+                        likedMessages.has(message.id) ? 'text-blue-600 fill-blue-600' : 'text-gray-600'
+                      }`} />
+                    </button>
+                    <button
+                      onClick={() => handleDislikeMessage(message.id)}
+                      className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                      title="No me gusta"
+                    >
+                      <ThumbsDown className={`w-4 h-4 ${
+                        dislikedMessages.has(message.id) ? 'text-red-600 fill-red-600' : 'text-gray-600'
+                      }`} />
+                    </button>
+                    <button
+                      onClick={() => handleShareMessage(message.content)}
+                      className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                      title="Compartir"
+                    >
+                      <Share className="w-4 h-4 text-gray-600" />
+                    </button>
+                    <button
+                      onClick={() => handleRegenerateResponse(message.id)}
+                      className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                      title="Regenerar respuesta"
+                      disabled={regeneratingMessageId === message.id}
+                    >
+                      {regeneratingMessageId === message.id ? (
+                        <Loader2 className="w-4 h-4 text-gray-600 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-4 h-4 text-gray-600" />
+                      )}
+                    </button>
+                    <button
+                      onClick={() => toggleSources(message.id)}
+                      className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                      title="Ver fuentes"
+                    >
+                      <Globe className={`w-4 h-4 ${
+                        showSourcesForMessage === message.id ? 'text-blue-600' : 'text-gray-600'
+                      }`} />
+                    </button>
+                  </div>
+                )}
+                
+                {message.role === 'assistant' && showSourcesForMessage === message.id && (() => {
+                  const ragSources = message.metadata?.sources || message.metadata?.rag?.chunks || [];
+                  const actuallyUsedSources = message.metadata?.actually_used_sources === true;
+                  const hasRagSources = ragSources.length > 0 && actuallyUsedSources;
+                  const modelUsed = message.model || 'gpt-4o-mini';
+                  const modelDisplayName = 'xigma';
+                  
+                  return (
+                    <div className="mt-3 ml-2 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Globe className="w-4 h-4 text-blue-600" />
+                        <h4 className="font-medium text-blue-900">
+                          Referencias Bibliográficas
+                        </h4>
+                      </div>
+                      
+                      {hasRagSources ? (
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                            <div className="flex-shrink-0 w-2 h-2 bg-green-500 rounded-full"></div>
+                            <p className="text-sm text-green-900">
+                              <strong>Fuente:</strong> Base de Conocimiento Médica de <strong>{specialty}</strong>
+                            </p>
+                          </div>
+                          
+                          <p className="text-sm text-blue-800">
+                            Se encontraron <strong>{ragSources.length} referencias relevantes</strong> en nuestra base de datos especializada.
+                          </p>
+                          
+                          <div className="space-y-2">
+                            {ragSources.map((source: any, idx: number) => {
+                              const similarity = source.similarity || 0;
+                              const percentage = Math.round(similarity * 100);
+                              
+                              let badgeColor = 'bg-gray-100 text-gray-700';
+                              let barColor = 'bg-gray-400';
+                              if (percentage >= 85) {
+                                badgeColor = 'bg-green-100 text-green-700';
+                                barColor = 'bg-green-500';
+                              } else if (percentage >= 70) {
+                                badgeColor = 'bg-blue-100 text-blue-700';
+                                barColor = 'bg-blue-500';
+                              } else if (percentage >= 50) {
+                                badgeColor = 'bg-yellow-100 text-yellow-700';
+                                barColor = 'bg-yellow-500';
+                              }
+                              
+                              return (
+                                <div key={idx} className="p-3 bg-white border border-blue-200 rounded-lg">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="text-xs font-medium text-blue-900">
+                                      Fuente {source.index || idx + 1}
+                                    </span>
+                                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${badgeColor}`}>
+                                      Relevancia: {percentage}%
+                                    </span>
+                                  </div>
+                                  
+                                  <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden mb-2">
+                                    <div 
+                                      className={`h-full ${barColor} transition-all duration-500`}
+                                      style={{ width: `${percentage}%` }}
+                                    />
+                                  </div>
+                                  
+                                  {source.preview && (
+                                    <p className="text-xs text-gray-700 mt-2 italic line-clamp-3">
+                                      "{source.preview}"
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                          
+                          <div className="mt-3 p-3 bg-blue-100 border border-blue-300 rounded-lg">
+                            <p className="text-xs text-blue-800">
+                              <strong>📚 Información:</strong> Estas fuentes provienen de nuestra base de conocimiento médica especializada, actualizada regularmente con literatura científica y guías clínicas.
+                            </p>
+                          </div>
+                          
+                          <div className="flex items-center gap-2 text-xs text-gray-600">
+                            <Sparkles className="w-3 h-3 text-purple-600" />
+                            <span>Modelo: <strong>{modelDisplayName}</strong></span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                            <div className="flex-shrink-0 w-2 h-2 bg-purple-500 rounded-full"></div>
+                            <p className="text-sm text-purple-900">
+                              <strong>Fuente:</strong> Conocimiento Médico General <strong>{modelDisplayName}</strong>
+                            </p>
+                          </div>
+                          
+                          <p className="text-sm text-blue-800">
+                            Esta respuesta se basa en el conocimiento médico general entrenado en el modelo de IA, que incluye información de fuentes médicas confiables hasta su última actualización.
+                          </p>
+                          
+                          <div className="mt-3 space-y-2">
+                            <p className="text-xs font-medium text-blue-900">El modelo se entrenó con información de:</p>
+                            <ul className="list-disc list-inside space-y-1 ml-2 text-xs text-blue-800">
+                              <li>Guías clínicas internacionales</li>
+                              <li>Literatura médica revisada por pares</li>
+                              <li>Protocolos de práctica clínica</li>
+                              <li>Bases de datos médicas especializadas</li>
+                            </ul>
+                          </div>
+                          
+                          <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                            <p className="text-xs text-amber-800">
+                              <strong>💡 Nota:</strong> Esta información es educativa y de referencia general. Para información específica de {specialty}, recomendamos consultar con un profesional de la salud.
+                            </p>
+                          </div>
+                          
+                          <div className="flex items-center gap-2 text-xs text-gray-600">
+                            <Sparkles className="w-3 h-3 text-purple-600" />
+                            <span>Modelo: <strong>{modelDisplayName}</strong></span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          ))}
+          {isTyping && (
+            <div className="flex justify-start">
+              <div className="bg-gray-100 rounded-2xl p-4">
+                <div className="flex gap-1">
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {currentChatId === null && messages.length === 1 && (
+            <div className="px-1 pb-2">
+              <div className="flex flex-wrap gap-2 overflow-x-auto">
+                {(getRandomSuggestions(specialty as any) || []).map((suggestion, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      setInputMessage(suggestion);
+                      setTimeout(() => {
+                        handleSendMessage();
+                      }, 0);
+                    }}
+                    className={`px-4 py-2 rounded-full border-2 ${
+                      specialty === 'MyPelvic'
+                        ? 'border-teal-500 text-teal-700 hover:bg-teal-50'
+                        : 'border-blue-500 text-blue-700 hover:bg-blue-50'
+                    } transition-colors text-sm whitespace-nowrap`}
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {pendingAttachments.length > 0 && (
+          <div className="px-4 pb-2">
+            <div className="flex gap-2 overflow-x-auto">
+              {pendingAttachments.map((attachment, idx) => (
+                <div
+                  key={idx}
+                  className="flex-shrink-0 relative"
+                >
+                  {attachment.type === 'image' ? (
+                    <div className="relative">
+                      <img 
+                        src={attachment.url} 
+                        alt={attachment.name}
+                        className="h-20 w-20 object-cover rounded-lg border-2 border-gray-300"
+                      />
+                      <button 
+                        onClick={() => removeAttachment(idx)}
+                        className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 bg-gray-100 px-3 py-2 rounded-lg">
+                      {attachment.type === 'file' && <FileText className="w-4 h-4" />}
+                      {attachment.type === 'audio' && <Volume2 className="w-4 h-4" />}
+                      <span className="text-sm max-w-[120px] truncate">{attachment.name}</span>
+                      <button onClick={() => removeAttachment(idx)}>
+                        <X className="w-4 h-4 text-gray-500 hover:text-gray-700" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {showAudioRecorder && (
+          <div className="px-4 pb-2">
+            <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 flex items-center gap-3">
+              <div className="flex-1 flex items-center gap-3">
+                <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                <span className="text-red-700 font-medium">
+                  {isRecording ? `Grabando ${formatRecordingTime(recordingTime)}` : 'Preparando...'}
+                </span>
+              </div>
+              <div className="flex gap-2">
+                {!isRecording ? (
+                  <button
+                    onClick={startRecording}
+                    className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                  >
+                    Iniciar
+                  </button>
+                ) : (
+                  <button
+                    onClick={stopRecording}
+                    className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors"
+                  >
+                    Detener
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    stopRecording();
+                    setShowAudioRecorder(false);
+                  }}
+                  className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            {microphoneError && (
+              <p className="text-red-600 text-sm mt-2">{microphoneError}</p>
+            )}
           </div>
         )}
       </div>
 
-      {/* Hidden file inputs */}
       <input
         ref={imageInputRef}
         type="file"
@@ -1582,7 +1506,6 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
         </div>
       )}
 
-      {/* Edit Toast Notification */}
       {editToastMessage && (
         <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4">
           <div className="bg-gray-900 text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-2">
@@ -1591,6 +1514,6 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
           </div>
         </div>
       )}
-    </ScreenContainer>
+    </AppShell>
   );
 }

@@ -47,6 +47,7 @@ function LoadingFallback() {
 
 export default function App() {
   const { user, session, loading: authLoading } = useAuth();
+  const appUser = user ?? session?.user ?? null;
   const [currentScreen, setCurrentScreen] = useState<Screen>('login');
   const [selectedSpecialty, setSelectedSpecialty] = useState<Specialty>(null);
   const [patientData, setPatientData] = useState<PatientData>({
@@ -107,11 +108,11 @@ export default function App() {
 
   // 🆕 Función para guardar diagnóstico (simulado por ahora)
   const handleSaveDiagnosis = async () => {
-    if (!diagnosisResult || !selectedSpecialty || !user || !session) {
+    if (!diagnosisResult || !selectedSpecialty || !appUser || !session) {
       console.error('Missing required data:', {
         diagnosisResult: !!diagnosisResult,
         selectedSpecialty: !!selectedSpecialty,
-        user: !!user,
+        user: !!appUser,
         session: !!session
       });
       return;
@@ -128,7 +129,7 @@ export default function App() {
     ].filter(s => s);
     
     console.log('💾 Saving diagnosis result...');
-    console.log('User:', user.email);
+    console.log('User:', appUser?.email);
     console.log('Session access_token:', session.access_token ? 'Present' : 'Missing');
     console.log('Diagnosis result:', diagnosisResult);
     console.log('Patient data:', patientData);
@@ -281,7 +282,11 @@ export default function App() {
 
   // Handlers de navegación principal
   const handleLogin = () => {
-    console.log('handleLogin called, user:', user);
+    if (!appUser) {
+      console.error('handleLogin called without user/session ready');
+      return;
+    }
+    console.log('handleLogin called, user:', appUser);
     setCurrentScreen('specialty-selection');
   };
   
@@ -376,7 +381,7 @@ export default function App() {
   // 🆕 ACTUALIZADO: Auto-guardar diagnóstico si no está guardado
   const handleStartTreatmentPlan = async () => {
     // Si el diagnóstico no ha sido guardado, guardarlo automáticamente de forma silenciosa
-    if (!savedDiagnosisId && diagnosisResult && selectedSpecialty && user && session) {
+  if (!savedDiagnosisId && diagnosisResult && selectedSpecialty && appUser && session) {
       console.log('💾 Auto-guardando diagnóstico silenciosamente antes de ir al plan...');
       await handleSilentSaveDiagnosis(); // 🔥 Guardar SILENTIOSAMENTE (sin modal)
     }
@@ -498,9 +503,8 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className={`${currentScreen === 'admin' ? '' : 'flex items-center justify-center p-4 min-h-screen'}`}>
-        <div className={`w-full ${currentScreen === 'admin' ? '' : 'max-w-md h-[844px]'}`}>
+    <div className="bg-gray-50 w-full h-[100dvh]">
+      <div className="w-full h-full">
           {currentScreen === 'login' && (
             <LoginScreen onLogin={handleLogin} />
           )}
@@ -737,8 +741,6 @@ export default function App() {
               />
             </Suspense>
           )}
-        </div>
-      </div>
       {showSuccessModal && successModalData && selectedSpecialty && (
         <SuccessModal
           isOpen={showSuccessModal}
@@ -754,6 +756,7 @@ export default function App() {
           }}
         />
       )}
-    </div>
+        </div>
+      </div>
   );
 }
