@@ -1,5 +1,5 @@
 import { projectId, publicAnonKey } from '../utils/supabase/info';
-import { supabase } from '../utils/supabase/client';
+import { supabase } from '../utils/supabaseClient';
 import type { Attachment, Message } from '../types';
 
 const API_BASE_URL = `https://${projectId}.supabase.co/functions/v1/make-server-baa51d6b`;

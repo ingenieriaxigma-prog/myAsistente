@@ -17,6 +17,7 @@ app.use("*", logger(console.log));
 // Initialize Supabase client
 const supabaseUrl = Deno.env.get('SUPABASE_URL');
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+// TODO: centralize Supabase client when server config can share the common instance.
 const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
 
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');

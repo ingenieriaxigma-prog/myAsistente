@@ -25,6 +25,7 @@ Deno.serve(async (req) => {
     /* --------------------------------------------------
      * 3. Crear cliente Supabase (con JWT del usuario)
      * -------------------------------------------------- */
+    // TODO: centralize Supabase client when edge function config aligns with shared instance.
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,

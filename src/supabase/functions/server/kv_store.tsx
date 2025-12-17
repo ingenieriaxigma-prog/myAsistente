@@ -12,6 +12,7 @@ CREATE TABLE kv_store_baa51d6b (
 // This file provides a simple key-value interface for storing app data. It should be adequate for most small-scale use cases.
 import { createClient } from "jsr:@supabase/supabase-js@2.49.8";
 
+// TODO: centralize Supabase client when server config can share the common instance.
 const client = () => createClient(
   Deno.env.get("SUPABASE_URL"),
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),

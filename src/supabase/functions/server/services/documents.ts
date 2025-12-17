@@ -7,6 +7,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+// TODO: centralize Supabase client when server config can share the common instance.
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 export interface Document {
