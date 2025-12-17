@@ -942,10 +942,10 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
 
   return (
     <AppShell header={headerContent} footer={<AppFooter>{footerContent}</AppFooter>}>
-      <div className="flex-1 flex flex-col overflow-hidden w-full md:max-w-[720px] lg:max-w-[800px] mx-auto">
+      <div className="flex-1 flex flex-col overflow-hidden w-full max-w-full md:max-w-[1100px] lg:max-w-[1200px] mx-auto px-4 md:px-5 lg:px-6 md:gap-2">
         {/* Messages Area */}
         <div
-          className="flex-1 overflow-y-auto p-4 space-y-4"
+          className="flex-1 overflow-y-auto p-4 md:p-5 lg:p-6 space-y-4 md:space-y-3"
           ref={messagesContainerRef}
         >
           {messages.map((message) => (

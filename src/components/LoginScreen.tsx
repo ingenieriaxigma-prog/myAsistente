@@ -81,42 +81,45 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
 
   return (
     <ScreenContainer>
-      {/* Header con gradiente */}
-      <GradientHeader gradient={appGradient} className="p-6 text-white text-center flex-shrink-0">
-        <div className="w-20 h-20 bg-white rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-lg">
-          <div className={`bg-gradient-to-br ${appGradient} w-[72px] h-[72px] rounded-xl flex items-center justify-center`}>
-            <Heart className="w-10 h-10 text-white animate-[heartbeat_1.5s_ease-in-out_infinite]" fill="white" />
-          </div>
-        </div>
-        <h1 className="text-3xl mb-2">My</h1>
-        <p className="text-base text-blue-100">Asistente</p>
-      </GradientHeader>
+      <div className="flex-1 w-full md:min-h-screen md:bg-[#f5f7fa] md:flex md:items-center md:justify-center">
+        <div className="w-full md:max-w-[480px] md:bg-white md:rounded-2xl md:shadow-lg md:border md:border-gray-100 md:p-6 md:mx-auto">
+          {/* Header con gradiente */}
+          <GradientHeader gradient={appGradient} className="p-6 md:p-5 text-white text-center flex-shrink-0">
+            <div className="w-20 h-20 bg-white rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-lg">
+              <div className={`bg-gradient-to-br ${appGradient} w-[72px] h-[72px] rounded-xl flex items-center justify-center`}>
+                <Heart className="w-10 h-10 text-white animate-[heartbeat_1.5s_ease-in-out_infinite]" fill="white" />
+              </div>
+            </div>
+            <h1 className="text-3xl mb-2">My</h1>
+            <p className="text-base text-blue-100">Asistente</p>
+          </GradientHeader>
 
-      {/* Formulario con scroll */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="p-6">
-          <div className="flex gap-2 mb-6 bg-gray-100 p-1.5 rounded-xl">
-            <button
-              onClick={() => setIsLogin(true)}
-              className={`flex-1 py-3 rounded-lg transition-all text-base font-medium ${
-                isLogin 
-                  ? 'bg-white shadow-md' 
-                  : 'text-gray-600'
-              }`}
-            >
-              Iniciar Sesión
-            </button>
-            <button
-              onClick={() => setIsLogin(false)}
-              className={`flex-1 py-3 rounded-lg transition-all text-base font-medium ${
-                !isLogin 
-                  ? 'bg-white shadow-md' 
-                  : 'text-gray-600'
-              }`}
-            >
-              Registro
-            </button>
-          </div>
+          {/* Formulario con scroll */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="p-6 md:p-5">
+              <div className="w-full max-w-[420px] mx-auto bg-white rounded-xl shadow-md px-6 py-6 md:px-6 md:py-6">
+                <div className="flex gap-2 mb-6 md:mb-4 bg-gray-100 p-1.5 rounded-xl">
+                  <button
+                    onClick={() => setIsLogin(true)}
+                    className={`flex-1 py-3 rounded-lg transition-all text-base font-medium ${
+                      isLogin 
+                        ? 'bg-white shadow-md' 
+                        : 'text-gray-600'
+                    }`}
+                  >
+                    Iniciar Sesión
+                  </button>
+                  <button
+                    onClick={() => setIsLogin(false)}
+                    className={`flex-1 py-3 rounded-lg transition-all text-base font-medium ${
+                      !isLogin 
+                        ? 'bg-white shadow-md' 
+                        : 'text-gray-600'
+                    }`}
+                  >
+                    Registro
+                  </button>
+                </div>
 
           {/* Error message */}
           {error && (
@@ -125,7 +128,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-5 md:space-y-4">
             {!isLogin && (
               <div>
                 <label className="block text-gray-700 mb-2 text-base font-medium">
@@ -261,6 +264,9 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
               </label>
             </div>
           )}
+            </div>
+          </div>
+        </div>
         </div>
       </div>
 

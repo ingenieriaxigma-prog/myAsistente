@@ -504,7 +504,8 @@ export default function App() {
 
   return (
     <div className="bg-gray-50 w-full h-[100dvh]">
-      <div className="w-full h-full">
+      <div className="w-full h-full md:flex md:justify-center md:px-6 lg:px-8">
+        <div className="w-full h-full md:max-w-[1200px] md:bg-white md:rounded-2xl md:shadow-md md:overflow-hidden">
           {currentScreen === 'login' && (
             <LoginScreen onLogin={handleLogin} />
           )}
@@ -741,22 +742,23 @@ export default function App() {
               />
             </Suspense>
           )}
-      {showSuccessModal && successModalData && selectedSpecialty && (
-        <SuccessModal
-          isOpen={showSuccessModal}
-          title={successModalData.title}
-          message={successModalData.message}
-          details={successModalData.details}
-          specialty={selectedSpecialty}
-          onClose={() => setShowSuccessModal(false)}
-          onViewProfile={() => {
-            setShowSuccessModal(false);
-            setShowHistoryTab(true); // 🆕 Activar flag para mostrar historial
-            setCurrentScreen('profile');
-          }}
-        />
-      )}
+          {showSuccessModal && successModalData && selectedSpecialty && (
+            <SuccessModal
+              isOpen={showSuccessModal}
+              title={successModalData.title}
+              message={successModalData.message}
+              details={successModalData.details}
+              specialty={selectedSpecialty}
+              onClose={() => setShowSuccessModal(false)}
+              onViewProfile={() => {
+                setShowSuccessModal(false);
+                setShowHistoryTab(true); // 🆕 Activar flag para mostrar historial
+                setCurrentScreen('profile');
+              }}
+            />
+          )}
         </div>
       </div>
+    </div>
   );
 }

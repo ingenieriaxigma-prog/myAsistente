@@ -1,1 +1,0 @@
-import{j as t,i as r}from"./index-CKOHEspy.js";function n({onClick:s,label:e="Atrás",variant:a="light"}){const o=a==="light"?"text-white":"text-gray-700";return t.jsxs("button",{onClick:s,className:`flex items-center gap-1 ${o} hover:opacity-80 transition-opacity`,children:[t.jsx(r,{className:"w-5 h-5"}),t.jsx("span",{className:"text-sm",children:e})]})}export{n as B};

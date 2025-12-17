@@ -1,0 +1,30 @@
+{
+  "name": "My - Plataforma de Salud Digital",
+  "short_name": "My Health",
+  "description": "Plataforma de salud digital que combina modelos de IA con base de conocimiento médico para chat clínico y diagnóstico inteligente",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#3b82f6",
+  "orientation": "portrait",
+  "scope": "/",
+  "icons": [
+  {
+    "src": "/pwa-192x192.png",
+    "sizes": "192x192",
+    "type": "image/png",
+    "purpose": "any maskable"
+  },
+  {
+    "src": "/pwa-512x512.png",
+    "sizes": "512x512",
+    "type": "image/png",
+    "purpose": "any maskable"
+  }
+],
+  "categories": ["health", "medical", "lifestyle"],
+  "lang": "es-ES",
+  "dir": "ltr",
+  "prefer_related_applications": false,
+  "related_applications": []
+}

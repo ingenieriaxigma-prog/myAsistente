@@ -1,0 +1,62 @@
+:root {
+  --app-header-height: 56px;
+  --app-footer-height: 72px;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  margin: 0 auto;
+  padding: 0 0;
+}
+
+@media (min-width: 768px) {
+  /* Limita el ancho en desktop para centrar el contenido y dar aire lateral */
+  .app-shell {
+    max-width: 1200px;
+    background: #f5f7fa;
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
+
+.app-header {
+  flex-shrink: 0;
+  height: var(--app-header-height);
+  padding-top: env(safe-area-inset-top);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #fff;
+}
+
+.app-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(var(--app-footer-height) + env(safe-area-inset-bottom));
+}
+
+.app-footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--app-footer-height);
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 50;
+}
