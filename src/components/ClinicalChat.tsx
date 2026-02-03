@@ -260,9 +260,10 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
       buffer = lines.pop() || '';
 
       for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith('data:')) continue;
-        const data = trimmed.slice(5).trim();
+        const cleanLine = line.endsWith('\r') ? line.slice(0, -1) : line;
+        if (!cleanLine.startsWith('data:')) continue;
+        let data = cleanLine.slice(5);
+        if (data.startsWith(' ')) data = data.slice(1);
         if (data === '[DONE]') return;
 
         if (data.startsWith('{')) {
@@ -468,17 +469,22 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
       // Validate file type
       const validTypes = [
         'application/pdf',
-        'application/msword',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         'text/plain',
       ];
+      const maxDocumentBytes = 5 * 1024 * 1024; // 5 MB
       
       const fileExtension = file.name.split('.').pop()?.toLowerCase();
       const isValidType = validTypes.includes(file.type) || 
-                          ['pdf', 'doc', 'docx', 'txt'].includes(fileExtension || '');
+                          ['pdf', 'docx', 'txt'].includes(fileExtension || '');
       
       if (!isValidType) {
-        alert('Por favor selecciona un archivo válido (PDF, Word o TXT)');
+        alert('Por favor selecciona un archivo válido (PDF, DOCX o TXT)');
+        return;
+      }
+
+      if (file.size > maxDocumentBytes) {
+        alert('El documento supera el tamaño máximo permitido (5 MB).');
         return;
       }
       
@@ -551,9 +557,6 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
             textReader.onerror = reject;
             textReader.readAsText(file);
           });
-        } else {
-          // For Word docs, we can't extract text easily in browser
-          extractedText = '[Documento Word - el contenido será procesado por el asistente]';
         }
         
         // Create the attachment with extracted text
@@ -1075,7 +1078,7 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
                   className={`rounded-2xl p-4 ${
                     message.role === 'user'
                       ? `bg-gradient-to-br ${theme.gradient} text-white`
-                      : 'bg-gray-100 text-gray-800'
+                      : 'assistant-message'
                   }`}
                 >
                   {message.attachments && message.attachments.length > 0 && (
@@ -1463,7 +1466,7 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.webp"
+        accept=".pdf,.docx,.txt,.jpg,.jpeg,.png,.webp"
         onChange={handleFileUpload}
         className="hidden"
       />

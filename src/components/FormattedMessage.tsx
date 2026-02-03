@@ -5,53 +5,100 @@ interface FormattedMessageProps {
   isUser?: boolean;
 }
 
+const normalizeAssistantContent = (raw: string) => {
+  if (!raw) return raw;
+  let text = raw;
+  // Remove internal sources tag from visible output.
+  text = text.replace(/\[FUENTES_USADAS:[^\]]+\]/g, '').trim();
+  // Ensure headings start on a new line so Markdown can parse them.
+  text = text.replace(/([^\n])\s*(#{1,6}\s)/g, '$1\n\n$2');
+  // Convert bold-only lines (e.g. **Título**) into markdown headings.
+  text = text.replace(/^\*\*([^*\n]+)\*\*\s*$/gm, '### $1');
+  // Promote inline bold titles into headings when they start a line.
+  text = text.replace(/^\*\*([^*\n]+)\*\*\s*/gm, '### $1\n');
+  // Ensure ordered list items start on a new line.
+  text = text.replace(/([^\n])\s*(\d+\.\s)/g, '$1\n$2');
+  // Ensure unordered list items start on a new line.
+  text = text.replace(/([^\n])\s*([-*]\s)/g, '$1\n$2');
+  // Normalize asterisk bullets into markdown list items with spacing.
+  text = text.replace(/([^\n])\s*(\*\s)/g, '$1\n\n- ');
+  text = text.replace(/^\*\s/mg, '- ');
+  // Add line breaks before common field labels inside list items.
+  text = text.replace(/([^\n])\s*(Ofrecido por:|Descripción:|Nota:|Importante:|Recuerda que)/g, '$1\n$2');
+  // Ensure blank lines between consecutive list items.
+  text = text.replace(/\n(-\s[^\n]+)\n(?!\n)/g, '\n$1\n');
+  // Trim excessive blank lines.
+  text = text.replace(/\n{3,}/g, '\n\n').trim();
+  return text;
+};
+
 export function FormattedMessage({ content, isUser = false }: FormattedMessageProps) {
+  const normalizedContent = isUser ? content : normalizeAssistantContent(content);
+
   if (isUser) {
-    return <p className="whitespace-pre-wrap">{content}</p>;
+    return <p className="whitespace-pre-wrap">{normalizedContent}</p>;
   }
 
   return (
-    <div className="prose prose-sm max-w-none">
+    <div className="prose prose-sm max-w-none assistant-message-content">
       <ReactMarkdown
         components={{
+          // Section wrapper for assistant responses
+          section: ({ children }) => (
+            <div className="assistant-section">{children}</div>
+          ),
           // Headings
           h1: ({ children }) => (
-            <h1 className="text-lg font-bold mt-4 mb-2 text-gray-900">{children}</h1>
+            <div className="assistant-section">
+              <h1 className="assistant-heading">{children}</h1>
+            </div>
           ),
           h2: ({ children }) => (
-            <h2 className="text-base font-bold mt-3 mb-2 text-gray-900">{children}</h2>
+            <div className="assistant-section">
+              <h2 className="assistant-heading">{children}</h2>
+            </div>
           ),
           h3: ({ children }) => (
-            <h3 className="text-base font-bold mt-3 mb-2 text-gray-900">{children}</h3>
+            <div className="assistant-section">
+              <h3 className="assistant-heading">{children}</h3>
+            </div>
           ),
           h4: ({ children }) => (
-            <h4 className="text-sm font-bold mt-2 mb-1 text-gray-900">{children}</h4>
+            <div className="assistant-section">
+              <h4 className="assistant-heading">{children}</h4>
+            </div>
           ),
           
           // Paragraphs
           p: ({ children }) => (
-            <p className="mb-3 last:mb-0 text-gray-800 leading-relaxed">{children}</p>
+            <div className="assistant-section">
+              <p className="assistant-paragraph">{children}</p>
+            </div>
           ),
           
           // Lists
           ul: ({ children }) => (
-            <ul className="space-y-1 mb-3 ml-4">{children}</ul>
+            <div className="assistant-section">
+              <ul className="assistant-list">{children}</ul>
+            </div>
           ),
           ol: ({ children }) => (
-            <ol className="space-y-1 mb-3 ml-4 list-decimal">{children}</ol>
+            <div className="assistant-section">
+              <ol className="assistant-list assistant-list-ordered">{children}</ol>
+            </div>
           ),
           li: ({ children }) => (
-            <li className="text-gray-800 leading-relaxed">{children}</li>
+            <li className="assistant-list-item">{children}</li>
           ),
           
           // Strong/Bold
           strong: ({ children }) => (
-            <strong className="font-bold text-gray-900">{children}</strong>
+            <strong className="assistant-strong">{children}</strong>
           ),
           
           // Emphasis/Italic
           em: ({ children }) => (
-            <em className="italic text-gray-800">{children}</em>
+            <em className="assistant-em">{children}</em>
           ),
           
           // Code
@@ -59,23 +106,23 @@ export function FormattedMessage({ content, isUser = false }: FormattedMessagePr
             const isInline = !className;
             if (isInline) {
               return (
-                <code className="bg-gray-200 px-1.5 py-0.5 rounded text-sm font-mono text-gray-900">
+                <code className="assistant-code-inline">
                   {children}
                 </code>
               );
             }
             return (
-              <code className="block bg-gray-200 p-3 rounded-lg text-sm font-mono text-gray-900 overflow-x-auto mb-3">
-                {children}
-              </code>
+              <div className="assistant-section">
+                <code className="assistant-code-block">{children}</code>
+              </div>
             );
           },
           
           // Blockquote
           blockquote: ({ children }) => (
-            <blockquote className="border-l-4 border-gray-300 pl-4 italic text-gray-700 my-3">
-              {children}
-            </blockquote>
+            <div className="assistant-section">
+              <blockquote className="assistant-quote">{children}</blockquote>
+            </div>
           ),
           
           // Horizontal rule
@@ -84,7 +131,7 @@ export function FormattedMessage({ content, isUser = false }: FormattedMessagePr
           ),
         }}
       >
-        {content}
+        {normalizedContent}
       </ReactMarkdown>
     </div>
   );

@@ -4,6 +4,7 @@
  */
 
 import pdf from "npm:pdf-parse@1.1.1";
+import mammoth from "npm:mammoth@1.6.0";
 
 /**
  * Sanitize text to remove problematic characters and escape sequences
@@ -140,6 +141,29 @@ export async function extractTextFromTXT(base64Data: string): Promise<string> {
 }
 
 /**
+ * Extract text from DOCX files
+ */
+export async function extractTextFromDOCX(base64Data: string): Promise<string> {
+  try {
+    const base64String = base64Data.includes('base64,')
+      ? base64Data.split('base64,')[1]
+      : base64Data;
+
+    const binaryString = atob(base64String);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+
+    const { value } = await mammoth.extractRawText({ arrayBuffer: bytes.buffer });
+    return sanitizeText(value || '');
+  } catch (error) {
+    console.error('Error extracting text from DOCX:', error);
+    return '[Error al leer el archivo Word.]';
+  }
+}
+
+/**
  * Process attachments and extract text from files
  */
 export async function processAttachments(attachments: any[]): Promise<any[]> {
@@ -151,6 +175,8 @@ export async function processAttachments(attachments: any[]): Promise<any[]> {
   console.log('[processAttachments] Processing', attachments.length, 'attachments');
   const processedAttachments = [];
   
+  const MAX_DOCUMENT_BYTES = 5 * 1024 * 1024; // 5 MB
+
   for (const attachment of attachments) {
     console.log('[processAttachments] Processing attachment:', {
       type: attachment.type,
@@ -160,24 +186,56 @@ export async function processAttachments(attachments: any[]): Promise<any[]> {
     
     if (attachment.type === 'file' && attachment.base64) {
       const fileName = attachment.name?.toLowerCase() || '';
+      const size = typeof attachment.size === 'number' ? attachment.size : 0;
       
       // Check file type
       const isPDF = fileName.endsWith('.pdf') || attachment.base64.includes('application/pdf');
       const isTXT = fileName.endsWith('.txt') || attachment.base64.includes('text/plain');
+      const isDOCX = fileName.endsWith('.docx') || attachment.base64.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      const isDOC = fileName.endsWith('.doc') || attachment.base64.includes('application/msword');
+      const hasPlaceholderText = typeof attachment.extractedText === 'string' && attachment.extractedText.trim().startsWith('[');
+
+      if (size > MAX_DOCUMENT_BYTES) {
+        processedAttachments.push({
+          ...attachment,
+          extractedText: '',
+          extractionError: 'El documento supera el tamaño máximo permitido (5 MB).'
+        });
+        continue;
+      }
       
-      if (isPDF && !attachment.extractedText) {
+      if (isDOC) {
+        processedAttachments.push({
+          ...attachment,
+          extractedText: '',
+          extractionError: 'El formato DOC no es compatible. Por favor convierte el archivo a DOCX o PDF.'
+        });
+      } else if (isPDF && (!attachment.extractedText || hasPlaceholderText)) {
         console.log('[processAttachments] Extracting text from PDF:', attachment.name);
         const extractedText = await extractTextFromPDF(attachment.base64);
+        const isInvalid = !extractedText || extractedText.startsWith('[');
         processedAttachments.push({
           ...attachment,
-          extractedText
+          extractedText: isInvalid ? '' : extractedText,
+          extractionError: isInvalid ? 'No se pudo extraer texto del PDF. Es posible que sea escaneado o ilegible.' : undefined
         });
-      } else if (isTXT && !attachment.extractedText) {
+      } else if (isTXT && (!attachment.extractedText || hasPlaceholderText)) {
         console.log('[processAttachments] Extracting text from TXT:', attachment.name);
         const extractedText = await extractTextFromTXT(attachment.base64);
+        const isInvalid = !extractedText || extractedText.startsWith('[');
         processedAttachments.push({
           ...attachment,
-          extractedText
+          extractedText: isInvalid ? '' : extractedText,
+          extractionError: isInvalid ? 'No se pudo leer el archivo de texto. Verifica que no esté vacío o corrupto.' : undefined
+        });
+      } else if (isDOCX && (!attachment.extractedText || hasPlaceholderText)) {
+        console.log('[processAttachments] Extracting text from DOCX:', attachment.name);
+        const extractedText = await extractTextFromDOCX(attachment.base64);
+        const isInvalid = !extractedText || extractedText.startsWith('[');
+        processedAttachments.push({
+          ...attachment,
+          extractedText: isInvalid ? '' : extractedText,
+          extractionError: isInvalid ? 'No se pudo leer el documento Word. Verifica que no esté protegido o corrupto.' : undefined
         });
       } else {
         processedAttachments.push(attachment);

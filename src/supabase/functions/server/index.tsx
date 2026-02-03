@@ -8,6 +8,7 @@ import { cors } from "npm:hono/cors";
 import { logger } from "npm:hono/logger";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { getChatCompletionStream } from "./services/openai.ts";
+import { processAttachments } from "./pdf_extractor.tsx";
 
 const app = new Hono();
 
@@ -505,11 +506,17 @@ app.post("/make-server-baa51d6b/chat/:chatId/message", async (c) => {
     const chatId = c.req.param('chatId');
     const { message, useRAG, attachments } = await c.req.json();
     
-    const hasAttachments = attachments && attachments.length > 0;
+    const rawAttachments = attachments && attachments.length > 0 ? attachments : [];
+    const processedAttachments = await processAttachments(rawAttachments);
+    const hasAttachments = processedAttachments.length > 0;
+    const extractionError = processedAttachments.find((att: any) => att?.extractionError);
+    if (extractionError?.extractionError) {
+      return c.json({ error: extractionError.extractionError }, 400);
+    }
     
     // 🔍 DEBUG: Log what we received from frontend
     if (hasAttachments) {
-      console.log('🔍 DEBUG: Received attachments:', JSON.stringify(attachments.map((a: any) => ({
+      console.log('🔍 DEBUG: Received attachments:', JSON.stringify(processedAttachments.map((a: any) => ({
         type: a.type,
         name: a.name,
         hasDataUrl: !!a.data_url,
@@ -538,7 +545,7 @@ app.post("/make-server-baa51d6b/chat/:chatId/message", async (c) => {
         chat_id: chatId,
         role: 'user',
         content: message,
-        attachments: attachments || [],
+        attachments: processedAttachments || [],
       })
       .select()
       .single();

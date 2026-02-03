@@ -185,6 +185,102 @@ html {
 }
 
 /* ========================================
+   ASSISTANT CARD STYLES (CHAT)
+   ======================================== */
+
+.assistant-message {
+  background: #ffffff;
+  color: #1f2937;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+}
+
+.assistant-message-content {
+  line-height: 1.65;
+}
+
+.assistant-section {
+  background: linear-gradient(180deg, #ffffff 0%, #f7fafc 100%);
+  border: 1px solid #e6eef7;
+  border-radius: 16px;
+  padding: 12px 14px;
+  margin: 10px 0;
+}
+
+.assistant-section:first-child {
+  margin-top: 0;
+}
+
+.assistant-section:last-child {
+  margin-bottom: 0;
+}
+
+.assistant-heading {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.assistant-paragraph {
+  margin: 0;
+  color: #1f2937;
+}
+
+.assistant-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.assistant-list-ordered {
+  list-style: decimal;
+}
+
+.assistant-list-item {
+  color: #1f2937;
+}
+
+.assistant-strong {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.assistant-em {
+  color: #334155;
+  font-style: italic;
+}
+
+.assistant-code-inline {
+  background: #e5eefc;
+  color: #0f172a;
+  border-radius: 8px;
+  padding: 2px 6px;
+  font-size: 0.85rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.assistant-code-block {
+  display: block;
+  background: #e5eefc;
+  color: #0f172a;
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 0.85rem;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.assistant-quote {
+  margin: 0;
+  padding-left: 12px;
+  border-left: 3px solid #93c5fd;
+  color: #334155;
+  font-style: italic;
+}
+
+/* ========================================
    ANIMACIONES PERSONALIZADAS PARA LA APP
    ======================================== */
 
