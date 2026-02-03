@@ -252,8 +252,11 @@ export const chatApi = {
   },
 
   // Get chat history
-  async getChatHistory() {
-    return apiCall('/chats', {
+  async getChatHistory(limit: number = 20, offset: number = 0) {
+    const params = new URLSearchParams();
+    params.set('limit', String(limit));
+    params.set('offset', String(offset));
+    return apiCall(`/chats?${params.toString()}`, {
       method: 'GET',
     });
   },

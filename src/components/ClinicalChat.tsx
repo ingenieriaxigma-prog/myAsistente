@@ -97,6 +97,10 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
     ]);
     // Reset current chat when specialty changes
     setCurrentChatId(null);
+    setChatHistory([]);
+    setHistoryOffset(0);
+    setHasMoreHistory(true);
+    setHasLoadedHistory(false);
   }, [welcomeMessage]);
   
   const [inputMessage, setInputMessage] = useState('');
@@ -132,6 +136,9 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
   const [deletingChatId, setDeletingChatId] = useState<string | null>(null);
   const [deleteToastMessage, setDeleteToastMessage] = useState<string | null>(null);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [historyOffset, setHistoryOffset] = useState(0);
+  const [hasMoreHistory, setHasMoreHistory] = useState(true);
+  const [hasLoadedHistory, setHasLoadedHistory] = useState(false);
 
   // Helper para cargar mensajes de un chat sin alterar otros estados de UI
   const loadChatMessages = async (chatId: string) => {
@@ -171,10 +178,16 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
     }
   };
 
-  const reloadHistory = async () => {
+  const reloadHistory = async (mode: 'reset' | 'append' = 'reset') => {
     setIsLoadingHistory(true);
     try {
-      const { chats } = await chatApi.getChatHistory();
+      const limit = 20;
+      const offset = mode === 'append' ? historyOffset : 0;
+      if (mode === 'reset') {
+        setHistoryOffset(0);
+        setHasMoreHistory(true);
+      }
+      const { chats, nextOffset, hasMore } = await chatApi.getChatHistory(limit, offset);
       const formatted: ChatHistory[] = (chats || [])
         .map((chat: any) => ({
           id: chat.id,
@@ -186,11 +199,14 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
         .filter((chat: any) => !specialty || chat.specialty === specialty)
         .sort((a: ChatHistory, b: ChatHistory) => b.date.getTime() - a.date.getTime());
 
-      setChatHistory(formatted);
-      if (formatted.length > 0 && !currentChatId) {
-        // Seleccionar el más reciente y cargar mensajes para evitar estado "nuevo chat"
-        await loadChatMessages(formatted[0].id);
+      if (mode === 'append') {
+        setChatHistory(prev => [...prev, ...formatted]);
+      } else {
+        setChatHistory(formatted);
       }
+      setHistoryOffset(nextOffset ?? offset + formatted.length);
+      setHasMoreHistory(Boolean(hasMore));
+      setHasLoadedHistory(true);
       return formatted;
     } catch (error) {
       console.error('Error loading history:', error);
@@ -202,9 +218,17 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
 
   useEffect(() => {
     if (authLoading || !session?.access_token) return;
-    void reloadHistory();
+    // Do not load previous chats automatically (start fresh by default).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, session, specialty]);
+
+  const handleHistoryOpenChange = (open: boolean) => {
+    setShowHistory(open);
+    if (open && !authLoading && session?.access_token) {
+      setIsLoadingHistory(true);
+      void reloadHistory('reset');
+    }
+  };
 
   const streamAssistantResponse = async (
     chatId: string,
@@ -1472,13 +1496,25 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
       />
 
       {/* Chat History Sheet */}
-      <Sheet open={showHistory} onOpenChange={setShowHistory}>
+      <Sheet open={showHistory} onOpenChange={handleHistoryOpenChange}>
         <SheetContent side="left" className="w-full sm:max-w-md p-0 overflow-hidden flex flex-col">
           <SheetHeader className="p-4 border-b flex-shrink-0">
-            <SheetTitle>Historial de Chats</SheetTitle>
-            <SheetDescription>
-              Tus conversaciones anteriores
-            </SheetDescription>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <SheetTitle>Historial de Chats</SheetTitle>
+                <SheetDescription>
+                  Tus conversaciones anteriores
+                </SheetDescription>
+              </div>
+              <button
+                onClick={() => reloadHistory('reset')}
+                className="inline-flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                title="Actualizar historial"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Actualizar
+              </button>
+            </div>
           </SheetHeader>
 
           <div className="p-4 flex-shrink-0 border-b">
@@ -1505,6 +1541,12 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
           </div>
 
           <div className="flex-1 overflow-y-auto p-4">
+            {isLoadingHistory && (
+              <div className="mb-3 flex items-center gap-2 text-sm text-gray-500">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Cargando historial...
+              </div>
+            )}
             {isLoadingHistory ? (
               <div className="space-y-2">
                 {/* Skeleton loaders */}
@@ -1616,6 +1658,14 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
                     )}
                   </div>
                 ))}
+                {hasMoreHistory && (
+                  <button
+                    onClick={() => reloadHistory('append')}
+                    className="w-full py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    Cargar más
+                  </button>
+                )}
               </div>
             )}
           </div>

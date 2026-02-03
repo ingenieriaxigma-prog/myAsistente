@@ -259,12 +259,18 @@ app.get("/make-server-baa51d6b/chats", async (c) => {
   }
 
   try {
+    const limitParam = Number(c.req.query('limit') || '20');
+    const offsetParam = Number(c.req.query('offset') || '0');
+    const limit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 1), 50) : 20;
+    const offset = Number.isFinite(offsetParam) ? Math.max(offsetParam, 0) : 0;
+
     const { data: chats } = await supabase
       .from('chats')
       .select('*')
       .eq('user_id', user.id)
       .eq('is_archived', false)
-      .order('updated_at', { ascending: false });
+      .order('updated_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
     const formattedChats = (chats || []).map(chat => ({
       id: chat.id,
@@ -276,7 +282,11 @@ app.get("/make-server-baa51d6b/chats", async (c) => {
       lastUpdate: chat.updated_at,
     }));
 
-    return c.json({ chats: formattedChats });
+    return c.json({ 
+      chats: formattedChats,
+      nextOffset: offset + formattedChats.length,
+      hasMore: formattedChats.length === limit
+    });
   } catch (error) {
     return c.json({ error: 'Failed to fetch chats' }, 500);
   }
