@@ -685,6 +685,7 @@ ${kbContext}
             const extIsImage = /\.(png|jpe?g|webp|gif)$/.test(name);
             const urlStr = typeof attachment?.url === 'string' ? attachment.url : '';
             const urlIsDataImage = urlStr.startsWith('data:image/');
+            const urlIsHttpImage = urlStr.startsWith('http://') || urlStr.startsWith('https://');
             const mime = typeof attachment?.mimeType === 'string' ? attachment.mimeType : '';
             const mimeIsImage = mime.startsWith('image/');
             const hasBase64 = typeof attachment?.base64 === 'string' && attachment.base64.length > 0;
@@ -705,6 +706,7 @@ ${kbContext}
               (typeof attachment?.type === 'string' && attachment.type.startsWith('image/')) ||
               mimeIsImage ||
               urlIsDataImage ||
+              urlIsHttpImage ||
               (extIsImage && (hasBase64 || hasDataUrl || hasStoragePath));
 
             if (isImage) {
