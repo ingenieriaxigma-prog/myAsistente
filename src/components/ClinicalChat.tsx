@@ -20,7 +20,7 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
   const theme = useSpecialtyTheme(specialty);
   const { session, loading: authLoading } = useAuth();
   const API_BASE_URL = `https://${projectId}.supabase.co/functions/v1/make-server-baa51d6b`;
-  const CHAT_IMAGE_BUCKET = 'make-baa51d6b-chat-images';
+  const CHAT_IMAGE_BUCKET = 'chat-images';
   const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5MB
 
   // Helper function to copy text with fallback
@@ -307,8 +307,12 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
 
     try {
       const userId = session?.user?.id || 'anonymous';
+      const chatScope = currentChatId || 'new-chat';
       const ext = file.name.split('.').pop() || 'jpg';
-      const storagePath = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const storagePath = `${userId}/${chatScope}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      if (import.meta.env.DEV) {
+        console.log('[chat-image-upload] bucket:', CHAT_IMAGE_BUCKET, 'path:', storagePath);
+      }
 
       const { error: uploadError } = await supabase.storage
         .from(CHAT_IMAGE_BUCKET)

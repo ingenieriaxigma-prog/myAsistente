@@ -606,7 +606,7 @@ ${kbContext}
 
       const storagePath = typeof attachment.storagePath === 'string' ? attachment.storagePath : '';
       if (storagePath) {
-        const bucketName = 'make-baa51d6b-chat-images';
+        const bucketName = 'chat-images';
         const signed = await supabase.storage
           .from(bucketName)
           .createSignedUrl(storagePath, 60 * 60 * 24 * 7);
@@ -635,7 +635,7 @@ ${kbContext}
         (attachment.mimeType && attachment.mimeType.startsWith('image/') ? attachment.mimeType : '') ||
         extToMime[ext] ||
         'image/jpeg';
-      const bucketName = 'make-baa51d6b-chat-images';
+      const bucketName = 'chat-images';
 
       // Ensure bucket exists
       const { data: buckets } = await supabase.storage.listBuckets();
