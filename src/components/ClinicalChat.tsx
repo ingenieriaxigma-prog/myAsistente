@@ -179,6 +179,7 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
   };
 
   const reloadHistory = async (mode: 'reset' | 'append' = 'reset') => {
+    const startTime = Date.now();
     setIsLoadingHistory(true);
     try {
       const limit = 20;
@@ -212,7 +213,13 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
       console.error('Error loading history:', error);
       return [];
     } finally {
-      setIsLoadingHistory(false);
+      const elapsed = Date.now() - startTime;
+      const minVisibleMs = 300;
+      if (elapsed < minVisibleMs) {
+        setTimeout(() => setIsLoadingHistory(false), minVisibleMs - elapsed);
+      } else {
+        setIsLoadingHistory(false);
+      }
     }
   };
 
