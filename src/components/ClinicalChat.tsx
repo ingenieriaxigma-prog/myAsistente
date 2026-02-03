@@ -325,9 +325,18 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
         throw uploadError;
       }
 
+      const { data: publicData } = supabase.storage
+        .from(CHAT_IMAGE_BUCKET)
+        .getPublicUrl(storagePath);
+
       setPendingAttachments(prev => prev.map(att =>
         att === tempAttachment
-          ? { ...att, storagePath, uploading: false }
+          ? {
+              ...att,
+              storagePath,
+              uploading: false,
+              url: publicData?.publicUrl || att.url,
+            }
           : att
       ));
     } catch (error) {
