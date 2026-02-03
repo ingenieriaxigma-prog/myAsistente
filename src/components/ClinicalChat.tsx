@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo, useEffect } from 'react';
-import { ChevronLeft, Download, Mic, Image, Send, Menu, Plus, MessageCircle, Sparkles, Search, Trash2, Edit3, ListTree, X, FileText, Pause, Play, Copy, Volume2, ThumbsUp, ThumbsDown, RefreshCw, Share, Globe, Check, Loader2 } from 'lucide-react';
+import { ChevronLeft, Download, Mic, Image, Send, Menu, Plus, MessageCircle, Sparkles, Search, Trash2, Edit3, ListTree, X, FileText, Pause, Play, Copy, Volume2, ThumbsUp, ThumbsDown, RefreshCw, Share, Globe, Check, Loader2, Square } from 'lucide-react';
 import type { Specialty, Message, Attachment, ChatHistory } from '../types';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from './ui/sheet';
 import { useSpecialtyTheme } from '../hooks/useSpecialtyTheme';
@@ -122,6 +122,8 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
   const [regeneratingMessageId, setRegeneratingMessageId] = useState<string | null>(null);
   const [chatError, setChatError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
   
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -131,6 +133,8 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const lastUserMessageRef = useRef<HTMLDivElement | null>(null);
   const streamAbortRef = useRef<AbortController | null>(null);
+  const speechRecognitionRef = useRef<any>(null);
+  const voiceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const [chatHistory, setChatHistory] = useState<ChatHistory[]>([]);
   const [deletingChatId, setDeletingChatId] = useState<string | null>(null);
@@ -694,6 +698,97 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
     setShowAttachMenu(false);
   };
 
+  // SpeechRecognition (Web Speech API)
+  const stopVoiceRecognition = () => {
+    if (speechRecognitionRef.current) {
+      speechRecognitionRef.current.onresult = null;
+      speechRecognitionRef.current.onerror = null;
+      speechRecognitionRef.current.onend = null;
+      speechRecognitionRef.current.stop();
+      speechRecognitionRef.current = null;
+    }
+    if (voiceTimeoutRef.current) {
+      clearTimeout(voiceTimeoutRef.current);
+      voiceTimeoutRef.current = null;
+    }
+    setIsListening(false);
+  };
+
+  const startVoiceRecognition = () => {
+    setVoiceError(null);
+    const SpeechRecognitionCtor =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognitionCtor) {
+      alert('Tu navegador no soporta reconocimiento de voz. Usa Chrome o Edge.');
+      return;
+    }
+
+    if (isListening) {
+      stopVoiceRecognition();
+      return;
+    }
+
+    const recognition = new SpeechRecognitionCtor();
+    recognition.lang = 'es-ES';
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+
+    let finalTranscript = '';
+    recognition.onresult = (event: any) => {
+      let interimTranscript = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        if (result.isFinal) {
+          finalTranscript += result[0].transcript;
+        } else {
+          interimTranscript += result[0].transcript;
+        }
+      }
+
+      const combined = `${finalTranscript}${interimTranscript}`.trim();
+      setInputMessage(combined);
+
+      // Reset timeout when we receive speech
+      if (voiceTimeoutRef.current) {
+        clearTimeout(voiceTimeoutRef.current);
+      }
+      voiceTimeoutRef.current = setTimeout(() => {
+        recognition.stop();
+      }, 2000);
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error('Speech recognition error:', event);
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        setVoiceError('Permiso de micrófono denegado. Actívalo en tu navegador.');
+      } else {
+        setVoiceError('No se pudo iniciar el reconocimiento de voz.');
+      }
+      stopVoiceRecognition();
+    };
+
+    recognition.onend = () => {
+      stopVoiceRecognition();
+    };
+
+    speechRecognitionRef.current = recognition;
+    setIsListening(true);
+    recognition.start();
+
+    // Auto-timeout if user stops speaking
+    voiceTimeoutRef.current = setTimeout(() => {
+      recognition.stop();
+    }, 6000);
+  };
+
+  useEffect(() => {
+    return () => {
+      stopVoiceRecognition();
+    };
+  }, []);
+
   const handleChatSelect = async (chatId: string) => {
     await loadChatMessages(chatId);
     setShowHistory(false);
@@ -1050,6 +1145,24 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
           </button>
         </div>
         <button
+          onClick={startVoiceRecognition}
+          className={`p-3 rounded-xl transition-colors flex items-center gap-2 ${
+            isListening
+              ? 'bg-green-100 text-green-700'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          }`}
+          title={isListening ? 'Detener' : 'Dictar por voz'}
+        >
+          {isListening ? <Square className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+          {isListening && (
+            <span className="inline-flex items-end gap-0.5">
+              <span className="w-1 h-2 bg-green-600 rounded-full animate-[voicePulse_1s_ease-in-out_infinite]" />
+              <span className="w-1 h-3 bg-green-600 rounded-full animate-[voicePulse_1s_ease-in-out_infinite_0.15s]" />
+              <span className="w-1 h-2.5 bg-green-600 rounded-full animate-[voicePulse_1s_ease-in-out_infinite_0.3s]" />
+            </span>
+          )}
+        </button>
+        <button
           onClick={handleSendMessage}
           disabled={!inputMessage.trim() || isTyping || isSending}
           className={`p-3 rounded-xl transition-colors ${
@@ -1061,6 +1174,12 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
           <Send className="w-5 h-5" />
         </button>
       </div>
+      {isListening && (
+        <p className="mt-2 text-xs text-green-600">Escuchando... (toca para detener)</p>
+      )}
+      {voiceError && (
+        <p className="mt-2 text-xs text-red-600">{voiceError}</p>
+      )}
       
       {showAttachMenu && (
         <div className="mt-2 flex gap-2">
