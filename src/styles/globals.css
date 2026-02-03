@@ -31,6 +31,14 @@
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
   --radius: 0.625rem;
+  --app-bg: #eef2f7;
+  --app-surface: #ffffff;
+  --app-border: #e2e8f0;
+  --app-muted: #64748b;
+  --app-primary: #0b2b6b;
+  --app-primary-strong: #1451b3;
+  --app-accent: #2b59ff;
+  --app-shadow: 0 18px 40px rgba(11, 23, 43, 0.12);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: #030213;
@@ -124,10 +132,16 @@
     @apply border-border outline-ring/50;
   }
 
-  body {
+body {
     @apply bg-background text-foreground;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@media (min-width: 1024px) {
+  body {
+    background: var(--app-bg);
   }
 }
 

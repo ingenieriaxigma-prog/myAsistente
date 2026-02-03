@@ -24,7 +24,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
 
   const { signIn, signUp } = useAuth();
 
-  const appGradient = 'from-blue-500 to-blue-600';
+  const appGradient = 'from-[#0b2b6b] to-[#1451b3]';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,148 +82,178 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
   };
 
   return (
-    <ScreenContainer>
-      <div className="flex-1 w-full md:min-h-screen md:bg-[#f5f7fa] md:flex md:items-center md:justify-center">
-        <div className="w-full md:max-w-[480px] md:bg-white md:rounded-2xl md:shadow-lg md:border md:border-gray-100 md:p-6 md:mx-auto">
-          {/* Header con gradiente */}
-          <GradientHeader gradient={appGradient} className="p-6 md:p-5 text-white text-center flex-shrink-0">
-            <div className="w-20 h-20 bg-white rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-lg">
-              <div className={`bg-gradient-to-br ${appGradient} w-[72px] h-[72px] rounded-xl flex items-center justify-center`}>
-                <Heart className="w-10 h-10 text-white animate-[heartbeat_1.5s_ease-in-out_infinite]" fill="white" />
+    <ScreenContainer className="bg-transparent shadow-none rounded-none">
+      <div className="flex-1 w-full min-h-screen bg-[#f2f5fb] md:bg-[#eef2f7]">
+        <div className="relative mx-auto w-full max-w-[1200px] px-4 py-10 md:px-10 md:py-16">
+          <div className="absolute inset-0 -z-10">
+            <div className="absolute -top-20 left-8 h-48 w-48 rounded-full bg-[#0b2b6b]/10 blur-[60px]" />
+            <div className="absolute bottom-6 right-8 h-52 w-52 rounded-full bg-[#1451b3]/10 blur-[70px]" />
+          </div>
+
+          <div className="grid items-center gap-8 md:grid-cols-[1.05fr_0.95fr]">
+            <div className="hidden md:block">
+              <div className="rounded-[28px] border border-[#e1e7f3] bg-white/80 p-8 shadow-[0_12px_30px_rgba(9,20,44,0.08)] backdrop-blur">
+                <div className={`inline-flex items-center gap-3 rounded-2xl bg-gradient-to-br ${appGradient} px-4 py-3 text-white shadow-[0_10px_24px_rgba(11,43,107,0.24)]`}>
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15">
+                    <Heart className="h-6 w-6 text-white" fill="white" />
+                  </span>
+                  <div className="text-left">
+                    <p className="text-xs uppercase tracking-[0.3em] text-white/70">My</p>
+                    <p className="text-xl font-semibold">Asistente</p>
+                  </div>
+                </div>
+
+                <h2 className="mt-6 text-2xl font-semibold text-[#0b2b6b]">
+                  Bienvenido a tu espacio clínico digital
+                </h2>
+                <p className="mt-3 text-sm leading-relaxed text-[#4b5b79]">
+                  Accede a tu historial, conversaciones y planes clínicos en un entorno seguro y ordenado.
+                </p>
+
+                <div className="mt-6 grid gap-3 text-sm text-[#2c3e5a]">
+                  <div className="rounded-2xl border border-[#e4eaf6] bg-[#f8faff] px-4 py-3">
+                    Diagnósticos guiados y recomendaciones personalizadas.
+                  </div>
+                  <div className="rounded-2xl border border-[#e4eaf6] bg-[#f8faff] px-4 py-3">
+                    Chat clínico con adjuntos e interpretación visual.
+                  </div>
+                  <div className="rounded-2xl border border-[#e4eaf6] bg-[#f8faff] px-4 py-3">
+                    Historial organizado por especialidad y fecha.
+                  </div>
+                </div>
               </div>
             </div>
-            <h1 className="text-3xl mb-2">My</h1>
-            <p className="text-base text-blue-100">Asistente</p>
-          </GradientHeader>
 
-          {/* Formulario con scroll */}
-          <div className="flex-1 overflow-y-auto">
-            <div className="p-6 md:p-5">
-              <div className="w-full max-w-[420px] mx-auto bg-white rounded-xl shadow-md px-6 py-6 md:px-6 md:py-6">
-                <div className="flex gap-2 mb-6 md:mb-4 bg-gray-100 p-1.5 rounded-xl">
+            <div className="w-full">
+              <div className="mx-auto w-full max-w-[520px] rounded-[28px] border border-[#e3e9f5] bg-white p-6 shadow-[0_12px_28px_rgba(11,23,43,0.08)] md:p-8">
+                <div className="mb-6 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.3em] text-[#9aa7bd]">MyAsistente</p>
+                    <h1 className="text-2xl font-semibold text-[#0b2b6b]">
+                      {isLogin ? 'Iniciar sesión' : 'Crear cuenta'}
+                    </h1>
+                  </div>
+                  <div className="hidden md:flex h-12 w-12 items-center justify-center rounded-2xl bg-[#f1f4fb]">
+                    <Heart className="h-6 w-6 text-[#0b2b6b]" fill="currentColor" />
+                  </div>
+                </div>
+
+                <div className="flex gap-2 rounded-2xl bg-[#f1f4fb] p-1">
                   <button
                     onClick={() => setIsLogin(true)}
-                    className={`flex-1 py-3 rounded-lg transition-all text-base font-medium ${
-                      isLogin 
-                        ? 'bg-white shadow-md' 
-                        : 'text-gray-600'
+                    className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all ${
+                      isLogin
+                        ? 'bg-white text-[#0b2b6b] shadow-[0_6px_16px_rgba(15,30,60,0.12)]'
+                        : 'text-[#64748b]'
                     }`}
                   >
-                    Iniciar Sesión
+                    Iniciar sesión
                   </button>
                   <button
                     onClick={() => setIsLogin(false)}
-                    className={`flex-1 py-3 rounded-lg transition-all text-base font-medium ${
-                      !isLogin 
-                        ? 'bg-white shadow-md' 
-                        : 'text-gray-600'
+                    className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all ${
+                      !isLogin
+                        ? 'bg-white text-[#0b2b6b] shadow-[0_6px_16px_rgba(15,30,60,0.12)]'
+                        : 'text-[#64748b]'
                     }`}
                   >
                     Registro
                   </button>
                 </div>
 
-          {/* Error message */}
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
-              {error}
-            </div>
-          )}
+                {/* Error message */}
+                {error && (
+                  <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {error}
+                  </div>
+                )}
 
-          <form onSubmit={handleSubmit} className="space-y-5 md:space-y-4">
-            {!isLogin && (
-              <div>
-                <label className="block text-gray-700 mb-2 text-base font-medium">
-                  Nombre completo
-                </label>
-                <div className="relative">
-                  <User className="absolute left-3 top-3.5 w-5 h-5 text-gray-400" />
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-base"
-                    placeholder="Ingresa tu nombre"
-                    required
-                  />
+                <form onSubmit={handleSubmit} className="space-y-5">
+                  {!isLogin && (
+                    <div>
+                      <label className="block text-sm font-semibold text-[#1f2a44]">Nombre completo</label>
+                      <div className="relative mt-2">
+                        <User className="absolute left-3 top-3.5 h-5 w-5 text-[#9aa7bd]" />
+                        <input
+                          type="text"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          className="w-full rounded-2xl border border-[#e2e8f0] bg-[#f7f9fc] py-3 pl-11 pr-4 text-sm text-[#1f2937] focus:border-[#2b59ff] focus:outline-none focus:ring-2 focus:ring-[#2b59ff]/20"
+                          placeholder="Ingresa tu nombre"
+                          required
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-sm font-semibold text-[#1f2a44]">Correo electrónico</label>
+                    <div className="relative mt-2">
+                      <Mail className="absolute left-3 top-3.5 h-5 w-5 text-[#9aa7bd]" />
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="w-full rounded-2xl border border-[#e2e8f0] bg-[#f7f9fc] py-3 pl-11 pr-4 text-sm text-[#1f2937] focus:border-[#2b59ff] focus:outline-none focus:ring-2 focus:ring-[#2b59ff]/20"
+                        placeholder="correo@ejemplo.com"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-[#1f2a44]">Contraseña</label>
+                    <div className="relative mt-2">
+                      <Lock className="absolute left-3 top-3.5 h-5 w-5 text-[#9aa7bd]" />
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full rounded-2xl border border-[#e2e8f0] bg-[#f7f9fc] py-3 pl-11 pr-12 text-sm text-[#1f2937] focus:border-[#2b59ff] focus:outline-none focus:ring-2 focus:ring-[#2b59ff]/20"
+                        placeholder="••••••••"
+                        required
+                      />
+                      <button
+                        type="button"
+                        className="absolute right-3 top-3.5 text-[#94a3b8] transition-colors hover:text-[#475569]"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {isLogin && (
+                    <div className="text-right">
+                      <button type="button" className="text-sm font-semibold text-[#2b59ff] hover:text-[#1d4ed8]">
+                        ¿Olvidaste tu contraseña?
+                      </button>
+                    </div>
+                  )}
+
+                  <GradientButton
+                    type="submit"
+                    gradient={appGradient}
+                    fullWidth
+                    className="py-3.5 text-sm font-semibold"
+                    disabled={loading}
+                  >
+                    {loading ? 'Procesando...' : (isLogin ? 'Iniciar Sesión' : 'Crear Cuenta')}
+                  </GradientButton>
+                </form>
+
+                <div className="my-6 flex items-center gap-4">
+                  <div className="h-px flex-1 bg-[#e2e8f0]"></div>
+                  <span className="text-xs uppercase tracking-[0.3em] text-[#94a3b8]">o</span>
+                  <div className="h-px flex-1 bg-[#e2e8f0]"></div>
                 </div>
-              </div>
-            )}
 
-            <div>
-              <label className="block text-gray-700 mb-2 text-base font-medium">
-                Correo electrónico
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-3.5 w-5 h-5 text-gray-400" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-base"
-                  placeholder="correo@ejemplo.com"
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-gray-700 mb-2 text-base font-medium">
-                Contraseña
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-3.5 w-5 h-5 text-gray-400" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-11 pr-12 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-base"
-                  placeholder="••••••••"
-                  required
-                />
                 <button
                   type="button"
-                  className="absolute right-3 top-3.5 text-gray-400 hover:text-gray-600 transition-colors"
-                  onClick={() => setShowPassword(!showPassword)}
+                  onClick={handleGoogleLogin}
+                  disabled={loading}
+                  className="flex w-full items-center justify-center gap-2.5 rounded-2xl border border-[#e2e8f0] bg-white py-3 text-sm font-semibold text-[#1f2937] transition-colors hover:bg-[#f8fafc] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-            </div>
-
-            {isLogin && (
-              <div className="text-right">
-                <button type="button" className="text-blue-600 text-sm hover:text-blue-700 transition-colors font-medium">
-                  ¿Olvidaste tu contraseña?
-                </button>
-              </div>
-            )}
-
-            <GradientButton
-              type="submit"
-              gradient={appGradient}
-              fullWidth
-              className="py-3.5 mt-6 text-base font-medium"
-              disabled={loading}
-            >
-              {loading ? 'Procesando...' : (isLogin ? 'Iniciar Sesión' : 'Crear Cuenta')}
-            </GradientButton>
-          </form>
-
-          {/* Separador */}
-          <div className="flex items-center gap-4 my-6">
-            <div className="flex-1 h-px bg-gray-200"></div>
-            <span className="text-gray-400 text-sm">o</span>
-            <div className="flex-1 h-px bg-gray-200"></div>
-          </div>
-
-          {/* Botón de Google */}
-          <button
-            type="button"
-            onClick={handleGoogleLogin}
-            disabled={loading}
-            className="w-full bg-white border-2 border-gray-200 text-gray-700 py-3.5 rounded-xl hover:bg-gray-50 transition-colors flex items-center justify-center gap-2.5 group text-base font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-          >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path
                 fill="#4285F4"
@@ -245,30 +275,29 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
             <span>Continuar con Google</span>
           </button>
 
-          {/* Términos y Condiciones */}
-          {!isLogin && (
-            <div className="mt-6 mb-4 flex items-start gap-3">
-              <input
-                type="checkbox"
-                id="terms"
-                checked={acceptedTerms}
-                onChange={(e) => setAcceptedTerms(e.target.checked)}
-                className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer flex-shrink-0"
-              />
-              <label htmlFor="terms" className="text-xs leading-relaxed text-gray-600 cursor-pointer select-none">
-                He leído y acepto los{' '}
-                <span
-                  onClick={() => setShowTermsModal(true)}
-                  className="text-blue-600 hover:text-blue-700 underline cursor-pointer font-medium"
-                >
-                  Términos y Condiciones
-                </span>
-              </label>
-            </div>
-          )}
+                {!isLogin && (
+                  <div className="mt-6 flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      id="terms"
+                      checked={acceptedTerms}
+                      onChange={(e) => setAcceptedTerms(e.target.checked)}
+                      className="mt-1 h-4 w-4 cursor-pointer rounded border-[#cbd5f5] text-[#2b59ff] focus:ring-[#2b59ff]"
+                    />
+                    <label htmlFor="terms" className="text-xs leading-relaxed text-[#64748b]">
+                      He leído y acepto los{' '}
+                      <span
+                        onClick={() => setShowTermsModal(true)}
+                        className="cursor-pointer font-semibold text-[#2b59ff] hover:text-[#1d4ed8]"
+                      >
+                        Términos y Condiciones
+                      </span>
+                    </label>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
         </div>
       </div>
 
