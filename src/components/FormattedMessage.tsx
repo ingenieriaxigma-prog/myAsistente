@@ -16,6 +16,11 @@ const normalizeAssistantContent = (raw: string) => {
   text = text.replace(/^\*\*([^*\n]+)\*\*\s*$/gm, '### $1');
   // Promote inline bold titles into headings when they start a line.
   text = text.replace(/^\*\*([^*\n]+)\*\*\s*/gm, '### $1\n');
+  // Promote bold labels with colon into headings.
+  text = text.replace(/^\*\*([^*\n]+?)\*\*:\s*$/gm, '### $1');
+  text = text.replace(/^\*\*([^*\n]+?)\*\*:\s*/gm, '### $1\n');
+  // Ensure bold labels start on a new line so they become separate sections.
+  text = text.replace(/([^\n])\s*(\*\*[^*\n]+?\*\*:)/g, '$1\n\n$2');
   // Ensure ordered list items start on a new line.
   text = text.replace(/([^\n])\s*(\d+\.\s)/g, '$1\n$2');
   // Ensure unordered list items start on a new line.

@@ -64,6 +64,28 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
       console.error('Failed to copy text:', err);
     }
   };
+
+  const sanitizeMarkdownForCopy = (raw: string) => {
+    if (!raw) return raw;
+    let text = raw;
+    // Remove internal sources tag
+    text = text.replace(/\[FUENTES_USADAS:[^\]]+\]/g, '');
+    // Headings
+    text = text.replace(/^#{1,6}\s+/gm, '');
+    // Bold/italic markers
+    text = text.replace(/\*\*(.*?)\*\*/g, '$1');
+    text = text.replace(/\*(.*?)\*/g, '$1');
+    text = text.replace(/__(.*?)__/g, '$1');
+    text = text.replace(/_(.*?)_/g, '$1');
+    // Inline code/backticks
+    text = text.replace(/`([^`]+)`/g, '$1');
+    // List markers
+    text = text.replace(/^\s*[-*+]\s+/gm, '• ');
+    text = text.replace(/^\s*\d+\.\s+/gm, m => m.trim().replace(/\.$/, '') + '. ');
+    // Normalize extra blank lines/spaces
+    text = text.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n');
+    return text.trim();
+  };
   
   // Mensaje de bienvenida según especialidad
   const welcomeMessage = useMemo(() => {
@@ -920,7 +942,12 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
 
   // Handler functions for message actions
   const handleCopyMessage = async (messageId: string, content: string) => {
-    await copyToClipboard(content);
+    const contentElement = document.getElementById(`message-content-${messageId}`);
+    const renderedText = contentElement?.innerText?.trim();
+    const cleanContent = renderedText && renderedText.length > 0
+      ? renderedText
+      : sanitizeMarkdownForCopy(content);
+    await copyToClipboard(cleanContent);
     setCopiedMessageId(messageId);
     setTimeout(() => setCopiedMessageId(null), 2000);
   };
@@ -1265,7 +1292,9 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
                       ))}
                     </div>
                   )}
-                  <FormattedMessage content={message.content} isUser={message.role === 'user'} />
+                  <div id={`message-content-${message.id}`}>
+                    <FormattedMessage content={message.content} isUser={message.role === 'user'} />
+                  </div>
                   <p className={`text-xs mt-2 ${message.role === 'user' ? 'text-white/70' : 'text-gray-500'}`}>
                     {message.timestamp.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
                   </p>
