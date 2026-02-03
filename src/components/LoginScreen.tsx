@@ -5,6 +5,7 @@ import { ScreenContainer } from './common/ScreenContainer';
 import { GradientHeader } from './common/GradientHeader';
 import { GradientButton } from './common/GradientButton';
 import { useAuth } from '../hooks/useAuth';
+import { supabase } from '../services/api';
 
 interface LoginScreenProps {
   onLogin: () => void;
@@ -21,7 +22,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const { signIn, signUp, signInWithOAuth } = useAuth();
+  const { signIn, signUp } = useAuth();
 
   const appGradient = 'from-blue-500 to-blue-600';
 
@@ -36,7 +37,6 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
         console.log('[LoginScreen] Starting sign in...');
         await signIn(email, password);
         console.log('[LoginScreen] Sign in completed successfully');
-        onLogin();
       } else {
         // Sign up
         if (!acceptedTerms) {
@@ -57,15 +57,17 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
     }
   };
 
-  const handleGoogleSignIn = async () => {
+  const handleGoogleLogin = async () => {
     setError('');
     setLoading(true);
 
     try {
-      // NOTE: To enable Google OAuth, you must configure it in your Supabase project
-      // Follow instructions at: https://supabase.com/docs/guides/auth/social-login/auth-google
-      await signInWithOAuth('google');
-      // OAuth redirect will handle the login
+      await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin
+        }
+      });
     } catch (err: any) {
       console.error('Google OAuth error:', err);
       setError(err.message || 'Error al autenticar con Google. Asegúrate de haber configurado OAuth en Supabase.');
@@ -218,7 +220,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
           {/* Botón de Google */}
           <button
             type="button"
-            onClick={handleGoogleSignIn}
+            onClick={handleGoogleLogin}
             disabled={loading}
             className="w-full bg-white border-2 border-gray-200 text-gray-700 py-3.5 rounded-xl hover:bg-gray-50 transition-colors flex items-center justify-center gap-2.5 group text-base font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >

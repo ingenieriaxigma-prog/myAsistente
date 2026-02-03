@@ -7,6 +7,7 @@ import { Hono } from "npm:hono";
 import { cors } from "npm:hono/cors";
 import { logger } from "npm:hono/logger";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { getChatCompletionStream } from "./services/openai.ts";
 
 const app = new Hono();
 
@@ -112,9 +113,8 @@ async function callOpenAI(messages: any[], hasAttachments: boolean = false) {
     return null;
   }
 
-  // FIXED: Use gpt-4o-mini for everything to avoid token limits
-  // gpt-4o has 30K TPM limit, gpt-4o-mini has higher limits
-  const model = 'gpt-4o-mini';
+  // Use vision-capable model
+  const model = 'gpt-4o';
   
   console.log(`🤖 Using model: ${model} (attachments: ${hasAttachments})`);
   console.log(`📝 Message context length: ${messages.length} messages`);
@@ -599,10 +599,80 @@ ${kbContext}
       }
     }
 
+    // Helper to ensure we have an accessible image URL (signed from storage if needed)
+    const getImageUrl = async (attachment: any): Promise<string | null> => {
+      const directUrl = typeof attachment.url === 'string' ? attachment.url : '';
+      if (directUrl && !directUrl.startsWith('blob:')) return directUrl;
+
+      const storagePath = typeof attachment.storagePath === 'string' ? attachment.storagePath : '';
+      if (storagePath) {
+        const bucketName = 'make-baa51d6b-chat-images';
+        const signed = await supabase.storage
+          .from(bucketName)
+          .createSignedUrl(storagePath, 60 * 60 * 24 * 7);
+        if (signed.error) {
+          console.error('❌ Error creating signed URL for OpenAI vision:', signed.error);
+          return null;
+        }
+        return signed.data.signedUrl;
+      }
+
+      const dataUrl = attachment.data_url || attachment.base64;
+      if (!dataUrl) return null;
+
+      const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+      const binaryData = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+      const fileExt = attachment.name?.split('.').pop() || 'jpg';
+      const ext = (fileExt || '').toLowerCase();
+      const extToMime: Record<string, string> = {
+        jpg: 'image/jpeg',
+        jpeg: 'image/jpeg',
+        png: 'image/png',
+        webp: 'image/webp',
+        gif: 'image/gif',
+      };
+      const contentType =
+        (attachment.mimeType && attachment.mimeType.startsWith('image/') ? attachment.mimeType : '') ||
+        extToMime[ext] ||
+        'image/jpeg';
+      const bucketName = 'make-baa51d6b-chat-images';
+
+      // Ensure bucket exists
+      const { data: buckets } = await supabase.storage.listBuckets();
+      const bucketExists = buckets?.some(bucket => bucket.name === bucketName);
+      if (!bucketExists) {
+        await supabase.storage.createBucket(bucketName, { public: false });
+      }
+
+      const uniquePath = `${chatId}/${crypto.randomUUID()}.${fileExt}`;
+      const upload = await supabase.storage
+        .from(bucketName)
+        .upload(uniquePath, binaryData, {
+          contentType,
+          upsert: true
+        });
+
+      if (upload.error) {
+        console.error('❌ Error uploading image for OpenAI vision:', upload.error);
+        return null;
+      }
+
+      const signed = await supabase.storage
+        .from(bucketName)
+        .createSignedUrl(upload.data.path, 60 * 60 * 24 * 7); // 7 days
+
+      if (signed.error) {
+        console.error('❌ Error creating signed URL for OpenAI vision:', signed.error);
+        return null;
+      }
+
+      return signed.data.signedUrl;
+    };
+
     // Prepare messages for OpenAI
     const openaiMessages = [
       { role: 'system', content: systemPrompt },
-      ...recentMessages.map(msg => {
+      ...(await Promise.all(recentMessages.map(async msg => {
         if (msg.attachments && msg.attachments.length > 0) {
           const contentParts = [
             { type: 'text', text: msg.content }
@@ -611,18 +681,45 @@ ${kbContext}
           let documentContext = '';
           
           for (const attachment of msg.attachments) {
-            if (attachment.type === 'image' && attachment.data_url) {
-              contentParts.push({
-                type: 'image_url',
-                image_url: {
-                  url: attachment.data_url,
-                  detail: 'high'
-                }
-              });
-              console.log(`📷 Added image: ${attachment.name}`);
+            const name = (attachment?.name || '').toLowerCase();
+            const extIsImage = /\.(png|jpe?g|webp|gif)$/.test(name);
+            const urlStr = typeof attachment?.url === 'string' ? attachment.url : '';
+            const urlIsDataImage = urlStr.startsWith('data:image/');
+            const mime = typeof attachment?.mimeType === 'string' ? attachment.mimeType : '';
+            const mimeIsImage = mime.startsWith('image/');
+            const hasBase64 = typeof attachment?.base64 === 'string' && attachment.base64.length > 0;
+            const hasDataUrl = typeof attachment?.data_url === 'string' && attachment.data_url.length > 0;
+            const hasStoragePath = typeof attachment?.storagePath === 'string' && attachment.storagePath.length > 0;
+            console.log('[vision] attachment', {
+              name: attachment?.name,
+              type: attachment?.type,
+              mimeType: attachment?.mimeType,
+              extIsImage,
+              hasBase64,
+              hasDataUrl,
+              hasStoragePath
+            });
+
+            const isImage =
+              attachment?.type === 'image' ||
+              (typeof attachment?.type === 'string' && attachment.type.startsWith('image/')) ||
+              mimeIsImage ||
+              urlIsDataImage ||
+              (extIsImage && (hasBase64 || hasDataUrl || hasStoragePath));
+
+            if (isImage) {
+              const imageUrl = await getImageUrl(attachment);
+              if (imageUrl) {
+                contentParts.push({
+                  type: 'image_url',
+                  image_url: { url: imageUrl }
+                });
+                console.log(`[vision] added image name=${attachment.name} urlPrefix=${imageUrl.substring(0, 8)}`);
+                continue;
+              }
             }
             
-            if (attachment.type === 'file' && attachment.extractedText) {
+            if (!isImage && attachment.type === 'file' && attachment.extractedText) {
               // LIMIT document text to 2000 chars to reduce tokens
               const limitedText = attachment.extractedText.substring(0, 2000);
               documentContext += `\n\n📄 ${attachment.name}\n${limitedText}${attachment.extractedText.length > 2000 ? '... [truncado]' : ''}\n`;
@@ -644,10 +741,10 @@ ${kbContext}
           role: msg.role,
           content: msg.content
         };
-      })
+      })))
     ];
-
     console.log(`📨 Prepared ${openaiMessages.length} messages for OpenAI`);
+    console.log('🔍 OpenAI payload preview:', JSON.stringify(openaiMessages, null, 2));
     
     // 🔍 DEBUG: Log message structure
     openaiMessages.forEach((msg, i) => {
@@ -662,6 +759,187 @@ ${kbContext}
       }
     });
 
+    const finalizeAIResponse = async (rawContent: string, modelUsed: string) => {
+      let aiContent = rawContent;
+      let actuallyUsedSources = false;
+      const sourceMarkerRegex = /\[FUENTES_USADAS:\s*(BASE_DE_DATOS|CONOCIMIENTO_GENERAL)\]/i;
+      const sourceMatch = aiContent.match(sourceMarkerRegex);
+
+      if (sourceMatch) {
+        actuallyUsedSources = sourceMatch[1].toUpperCase() === 'BASE_DE_DATOS';
+        aiContent = aiContent.replace(sourceMarkerRegex, '').trim();
+        console.log(`🎯 AI used: ${actuallyUsedSources ? 'BASE_DE_DATOS' : 'CONOCIMIENTO_GENERAL'}`);
+      }
+
+      const { data: aiMessage } = await supabase
+        .from('messages')
+        .insert({
+          chat_id: chatId,
+          role: 'assistant',
+          content: aiContent,
+          model: modelUsed,
+          metadata: useRAG ? {
+            rag_enabled: true,
+            sources_count: relevantChunks.length,
+            actually_used_sources: actuallyUsedSources,
+            sources: actuallyUsedSources ? relevantChunks.map((chunk, i) => ({
+              index: i + 1,
+              similarity: chunk.similarity,
+              preview: chunk.content.substring(0, 100) + '...'
+            })) : []
+          } : null
+        })
+        .select()
+        .single();
+
+      let updatedTitle = chat.title;
+      const messageCount = recentMessages.length;
+
+      if (messageCount === 1 || chat.title.includes('Chat') || chat.title === 'Nueva conversación') {
+        try {
+          const titleMessages = [
+            {
+              role: 'system',
+              content: 'Generate a short medical chat title in Spanish. Max 6 words, no quotes.'
+            },
+            {
+              role: 'user',
+              content: `Title for: "${message}"`
+            }
+          ];
+
+          const titleResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${OPENAI_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              messages: titleMessages,
+              max_tokens: 20,
+              temperature: 0.7,
+            }),
+          });
+
+          if (titleResponse.ok) {
+            const titleData = await titleResponse.json();
+            updatedTitle = titleData.choices?.[0]?.message?.content?.trim().replace(/^["']|["']$/g, '') || chat.title;
+
+            await supabase
+              .from('chats')
+              .update({
+                title: updatedTitle,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', chatId);
+          }
+        } catch (titleError) {
+          console.error('Title generation error:', titleError);
+          await supabase
+            .from('chats')
+            .update({ updated_at: new Date().toISOString() })
+            .eq('id', chatId);
+        }
+      } else {
+        await supabase
+          .from('chats')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('id', chatId);
+      }
+
+      return { aiMessage, updatedTitle, actuallyUsedSources };
+    };
+
+    // Vision debug before OpenAI call
+    const lastMsg = openaiMessages[openaiMessages.length - 1];
+    const imageParts = Array.isArray(lastMsg?.content)
+      ? lastMsg.content.filter((p: any) => p.type === 'image_url')
+      : [];
+    const firstImageUrl = imageParts[0]?.image_url?.url || '';
+    console.log('[vision] images:', imageParts.length, 'urlPrefix:', firstImageUrl.substring(0, 8));
+
+    const wantsStream = c.req.header('accept')?.includes('text/event-stream') || c.req.query('stream') === '1';
+    if (wantsStream) {
+      const streamAbort = new AbortController();
+      const timeoutId = setTimeout(() => streamAbort.abort(), 60000);
+      c.req.raw.signal.addEventListener('abort', () => streamAbort.abort(), { once: true });
+
+      const streamResult = await getChatCompletionStream(
+        {
+          model: 'gpt-4o',
+          messages: openaiMessages,
+          maxTokens: 2000,
+          temperature: 0.7,
+        },
+        streamAbort.signal
+      );
+
+      if (!streamResult || !streamResult.response.body) {
+        clearTimeout(timeoutId);
+        return c.json({ error: 'Failed to get AI response' }, 500);
+      }
+
+      const encoder = new TextEncoder();
+      const decoder = new TextDecoder();
+      const reader = streamResult.response.body.getReader();
+      let fullContent = '';
+
+      const stream = new ReadableStream({
+        async start(controller) {
+          let buffer = '';
+          let doneStream = false;
+          try {
+            while (true) {
+              const { value, done } = await reader.read();
+              if (done) break;
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split('\n');
+              buffer = lines.pop() || '';
+
+              for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed.startsWith('data:')) continue;
+                const data = trimmed.slice(5).trim();
+                if (data === '[DONE]') {
+                  controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+                  doneStream = true;
+                  break;
+                }
+                try {
+                  const parsed = JSON.parse(data);
+                  const delta = parsed.choices?.[0]?.delta?.content || '';
+                  if (delta) {
+                    fullContent += delta;
+                    controller.enqueue(encoder.encode(`data: ${delta}\n\n`));
+                  }
+                } catch {
+                  // Ignore parse errors for non-JSON lines
+                }
+              }
+              if (doneStream) break;
+            }
+
+            await finalizeAIResponse(fullContent, streamResult.model);
+          } catch (error) {
+            const message = error instanceof Error ? error.message : 'Stream error';
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: message })}\n\n`));
+          } finally {
+            clearTimeout(timeoutId);
+            controller.close();
+          }
+        }
+      });
+
+      return new Response(stream, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive'
+        }
+      });
+    }
+
     // Get AI response
   const aiResponse = await callOpenAI(openaiMessages, hasAttachments);
 
@@ -675,99 +953,7 @@ ${kbContext}
     return c.json({ error: 'Failed to get AI response' }, 500);
   }
 
-    let aiContent = aiResponse.content;
-    const modelUsed = aiResponse.model;
-
-    // Detect source usage
-    let actuallyUsedSources = false;
-    const sourceMarkerRegex = /\[FUENTES_USADAS:\s*(BASE_DE_DATOS|CONOCIMIENTO_GENERAL)\]/i;
-    const sourceMatch = aiContent.match(sourceMarkerRegex);
-    
-    if (sourceMatch) {
-      actuallyUsedSources = sourceMatch[1].toUpperCase() === 'BASE_DE_DATOS';
-      aiContent = aiContent.replace(sourceMarkerRegex, '').trim();
-      console.log(`🎯 AI used: ${actuallyUsedSources ? 'BASE_DE_DATOS' : 'CONOCIMIENTO_GENERAL'}`);
-    }
-
-    // Save AI message with RAG metadata INCLUDING chunks for frontend display
-    const { data: aiMessage } = await supabase
-      .from('messages')
-      .insert({
-        chat_id: chatId,
-        role: 'assistant',
-        content: aiContent,
-        model: modelUsed,
-        metadata: useRAG ? {
-          rag_enabled: true,
-          sources_count: relevantChunks.length,
-          actually_used_sources: actuallyUsedSources,
-          // 🔥 NEW: Include chunks for frontend to display sources
-          sources: actuallyUsedSources ? relevantChunks.map((chunk, i) => ({
-            index: i + 1,
-            similarity: chunk.similarity,
-            preview: chunk.content.substring(0, 100) + '...'
-          })) : []
-        } : null
-      })
-      .select()
-      .single();
-
-    // Auto-generate title if needed
-    let updatedTitle = chat.title;
-    const messageCount = recentMessages.length;
-    
-    if (messageCount === 1 || chat.title.includes('Chat') || chat.title === 'Nueva conversación') {
-      try {
-        const titleMessages = [
-          {
-            role: 'system',
-            content: 'Generate a short medical chat title in Spanish. Max 6 words, no quotes.'
-          },
-          {
-            role: 'user',
-            content: `Title for: "${message}"`
-          }
-        ];
-        
-        const titleResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${OPENAI_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o-mini',
-            messages: titleMessages,
-            max_tokens: 20,
-            temperature: 0.7,
-          }),
-        });
-
-        if (titleResponse.ok) {
-          const titleData = await titleResponse.json();
-          updatedTitle = titleData.choices?.[0]?.message?.content?.trim().replace(/^["']|["']$/g, '') || chat.title;
-          
-          await supabase
-            .from('chats')
-            .update({ 
-              title: updatedTitle,
-              updated_at: new Date().toISOString() 
-            })
-            .eq('id', chatId);
-        }
-      } catch (titleError) {
-        console.error('Title generation error:', titleError);
-        await supabase
-          .from('chats')
-          .update({ updated_at: new Date().toISOString() })
-          .eq('id', chatId);
-      }
-    } else {
-      await supabase
-        .from('chats')
-        .update({ updated_at: new Date().toISOString() })
-        .eq('id', chatId);
-    }
+    const { aiMessage, updatedTitle } = await finalizeAIResponse(aiResponse.content, aiResponse.model);
 
     return c.json({ 
       userMessage: {

@@ -91,6 +91,10 @@ export interface Attachment {
   size?: number;
   base64?: string; // Base64 data for images and files
   extractedText?: string; // Extracted text from PDFs and documents
+  mimeType?: string;
+  storagePath?: string;
+  uploading?: boolean;
+  uploadError?: string;
 }
 
 export interface ChatHistory {

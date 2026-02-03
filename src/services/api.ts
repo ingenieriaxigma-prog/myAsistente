@@ -279,7 +279,9 @@ export const chatApi = {
         url: att.url,
         size: att.size,
         data_url: att.base64, // Backend expects data_url instead of base64
-        extractedText: att.extractedText
+        extractedText: att.extractedText,
+        mimeType: att.mimeType,
+        storagePath: att.storagePath,
       };
       
       if (att.type === 'image' && att.base64) {

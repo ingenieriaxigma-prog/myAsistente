@@ -93,6 +93,55 @@ export async function getChatCompletion(
 }
 
 /**
+ * Call OpenAI Chat Completions API with streaming
+ */
+export async function getChatCompletionStream(
+  options: ChatCompletionOptions,
+  signal?: AbortSignal
+): Promise<{ response: Response; model: string } | null> {
+  if (!OPENAI_API_KEY) {
+    console.error('OpenAI API key not configured');
+    return null;
+  }
+
+  const {
+    model = 'gpt-4o-mini',
+    messages,
+    maxTokens = 2000,
+    temperature = 0.7,
+  } = options;
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        max_tokens: maxTokens,
+        temperature,
+        stream: true,
+      }),
+      signal,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('OpenAI API error:', errorData);
+      return null;
+    }
+
+    return { response, model };
+  } catch (error) {
+    console.error('Error calling OpenAI stream:', error);
+    return null;
+  }
+}
+
+/**
  * Generate a chat title based on the first user message
  */
 export async function generateChatTitle(firstMessage: string): Promise<string | null> {
@@ -138,7 +187,7 @@ export function prepareMessagesWithAttachments(
     // Build content array
     let contentArray: any[] = [
       {
-        type: 'text',
+        type: 'input_text',
         text: msg.content
       }
     ];
@@ -153,7 +202,7 @@ export function prepareMessagesWithAttachments(
         const fileName = String(file.name || 'documento').replace(/[\x00-\x1F\x7F-\x9F]/g, '');
         
         contentArray.push({
-          type: 'text',
+          type: 'input_text',
           text: `\n\n[Archivo adjunto: ${fileName}]\n${safeText}\n`
         });
       }
@@ -169,9 +218,8 @@ export function prepareMessagesWithAttachments(
             imageUrl = `data:image/jpeg;base64,${imageUrl}`;
           }
         }
-        
         return {
-          type: 'image_url',
+          type: 'input_image',
           image_url: {
             url: imageUrl,
             detail: 'high'
@@ -197,6 +245,6 @@ export function selectModel(messages: OpenAIMessage[]): string {
     Array.isArray(msg.content) && msg.content.some((c: any) => c.type === 'image_url')
   );
   
-  // Use gpt-4o for vision (supports images), gpt-4o-mini for text only
-  return hasVisionContent ? 'gpt-4o' : 'gpt-4o-mini';
+  // Use gpt-4o-mini (vision-capable) for all cases to keep a single model path
+  return hasVisionContent ? 'gpt-4o-mini' : 'gpt-4o-mini';
 }

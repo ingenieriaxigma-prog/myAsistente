@@ -5,10 +5,11 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '
 import { useSpecialtyTheme } from '../hooks/useSpecialtyTheme';
 import { BackButton } from './common/BackButton';
 import { getRandomSuggestions } from '../constants/prompts';
-import { chatApi } from '../services/api';
+import { chatApi, supabase } from '../services/api';
 import { FormattedMessage } from './FormattedMessage';
 import { useAuth } from '../hooks/useAuth';
 import { AppShell, AppHeader, AppFooter } from './layout';
+import { projectId } from '../utils/supabase/info';
 
 interface ClinicalChatProps {
   specialty: Specialty;
@@ -18,7 +19,10 @@ interface ClinicalChatProps {
 export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
   const theme = useSpecialtyTheme(specialty);
   const { session, loading: authLoading } = useAuth();
-  
+  const API_BASE_URL = `https://${projectId}.supabase.co/functions/v1/make-server-baa51d6b`;
+  const CHAT_IMAGE_BUCKET = 'make-baa51d6b-chat-images';
+  const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5MB
+
   // Helper function to copy text with fallback
   const copyToClipboard = async (text: string) => {
     try {
@@ -122,6 +126,7 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
   const audioChunksRef = useRef<Blob[]>([]);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const lastUserMessageRef = useRef<HTMLDivElement | null>(null);
+  const streamAbortRef = useRef<AbortController | null>(null);
   
   const [chatHistory, setChatHistory] = useState<ChatHistory[]>([]);
   const [deletingChatId, setDeletingChatId] = useState<string | null>(null);
@@ -201,9 +206,144 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, session, specialty]);
 
+  const streamAssistantResponse = async (
+    chatId: string,
+    message: string,
+    attachments?: Attachment[],
+    signal?: AbortSignal,
+    onDelta?: (chunk: string) => void
+  ) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const accessToken = session?.access_token || '';
+
+    const formattedAttachments = (attachments || []).map(att => ({
+      type: att.type,
+      name: att.name,
+      url: att.url,
+      size: att.size,
+      data_url: att.base64,
+      extractedText: att.extractedText,
+      mimeType: att.mimeType,
+      storagePath: att.storagePath
+    }));
+
+    const response = await fetch(`${API_BASE_URL}/chat/${chatId}/message?stream=1`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+        'Accept': 'text/event-stream',
+      },
+      body: JSON.stringify({
+        message,
+        attachments: formattedAttachments,
+        useRAG: true
+      }),
+      signal,
+    });
+
+    if (!response.ok || !response.body) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || errorData.error || 'Failed to stream message');
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('data:')) continue;
+        const data = trimmed.slice(5).trim();
+        if (data === '[DONE]') return;
+
+        if (data.startsWith('{')) {
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.error) {
+              throw new Error(parsed.error);
+            }
+          } catch (err) {
+            if (err instanceof Error) throw err;
+          }
+        } else if (data) {
+          onDelta?.(data);
+        }
+      }
+    }
+  };
+
+  const uploadImageAttachment = async (file: File) => {
+    if (file.size > MAX_IMAGE_BYTES) {
+      alert('La imagen supera el tamaño máximo permitido (5 MB).');
+      return;
+    }
+    const validTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      alert('Por favor selecciona una imagen válida (PNG, JPEG, GIF o WebP).');
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    const tempAttachment: Attachment = {
+      type: 'image',
+      name: file.name,
+      url: previewUrl,
+      size: file.size,
+      mimeType: file.type,
+      uploading: true,
+    };
+
+    setPendingAttachments(prev => [...prev, tempAttachment]);
+    setShowAttachMenu(false);
+
+    try {
+      const userId = session?.user?.id || 'anonymous';
+      const ext = file.name.split('.').pop() || 'jpg';
+      const storagePath = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(CHAT_IMAGE_BUCKET)
+        .upload(storagePath, file, {
+          contentType: file.type,
+          upsert: true,
+        });
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      setPendingAttachments(prev => prev.map(att =>
+        att === tempAttachment
+          ? { ...att, storagePath, uploading: false }
+          : att
+      ));
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      alert('No se pudo subir la imagen. Intenta nuevamente.');
+      setPendingAttachments(prev => prev.filter(att => att !== tempAttachment));
+    } finally {
+      if (imageInputRef.current) {
+        imageInputRef.current.value = '';
+      }
+    }
+  };
+
   const handleSendMessage = async () => {
     if (isSending) return;
     if (!inputMessage.trim()) return;
+    if (pendingAttachments.some(att => att.uploading)) {
+      alert('Espera a que terminen de subirse los adjuntos antes de enviar.');
+      return;
+    }
     setChatError(null);
     setIsSending(true);
 
@@ -249,53 +389,42 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
         throw new Error('No se pudo crear el chat');
       }
 
-      const { userMessage, aiMessage, chat, rag } = await chatApi.sendMessage(
+      streamAbortRef.current?.abort();
+      const abortController = new AbortController();
+      streamAbortRef.current = abortController;
+
+      const tempAiMessage: Message = {
+        id: `${Date.now()}-ai`,
+        role: 'assistant',
+        content: '',
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, tempAiMessage]);
+
+      let accumulated = '';
+      await streamAssistantResponse(
         chatIdToUse,
         userMessageContent,
-        pendingAttachments.length > 0 ? pendingAttachments : undefined
+        pendingAttachments.length > 0 ? pendingAttachments : undefined,
+        abortController.signal,
+        (chunk) => {
+          accumulated += chunk;
+          setMessages(prev => prev.map(m =>
+            m.id === tempAiMessage.id ? { ...m, content: accumulated } : m
+          ));
+        }
       );
-
-      console.log('Message sent with attachments:', pendingAttachments);
-      console.log('Chat updated from backend:', chat);
-      
-      // Log RAG info if available
-      if (rag?.enabled) {
-        console.log('📚 RAG enabled - found', rag.chunks_found, 'relevant chunks');
-      }
-
-      // Update messages with backend response
-      setMessages(prev => {
-        const withoutTemp = prev.filter(m => m.id !== tempUserMessage.id);
-        return [
-          ...withoutTemp,
-          {
-            ...userMessage,
-            timestamp: new Date(userMessage.timestamp),
-          },
-          {
-            ...aiMessage,
-            timestamp: new Date(aiMessage.timestamp),
-            metadata: aiMessage.metadata || (rag?.enabled ? { rag } : undefined),
-          },
-        ];
-      });
-
-      // If the chat title was updated (auto-generated), update the history
-      if (chat && chat.title) {
-        console.log('Updating chat title in history:', chat.title);
-        setChatHistory(prev => prev.map(c => 
-          c.id === chatIdToUse 
-            ? { ...c, title: chat.title, date: new Date(chat.lastUpdate) }
-            : c
-        ));
-      }
 
       await reloadHistory();
     } catch (error) {
       console.error('Error sending message:', error);
       
       // Add error message
-      setChatError(error instanceof Error ? error.message : 'Lo siento, hubo un error al procesar tu mensaje. Por favor intenta de nuevo.');
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        // Ignore aborts triggered by new messages
+      } else {
+        setChatError(error instanceof Error ? error.message : 'Lo siento, hubo un error al procesar tu mensaje. Por favor intenta de nuevo.');
+      }
     } finally {
       setIsTyping(false);
       setIsSending(false);
@@ -306,55 +435,7 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
     const files = e.target.files;
     if (files && files.length > 0) {
       const file = files[0];
-      
-      // Validate file type
-      const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
-      if (!validTypes.includes(file.type)) {
-        alert('Por favor selecciona una imagen válida (PNG, JPEG, GIF, o WebP)');
-        // Reset input
-        if (imageInputRef.current) {
-          imageInputRef.current.value = '';
-        }
-        return;
-      }
-      
-      // Convert image to base64
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64String = reader.result as string;
-        
-        // Log for debugging
-        console.log('Image uploaded:', {
-          name: file.name,
-          type: file.type,
-          size: file.size,
-          base64Preview: base64String.substring(0, 100) + '...'
-        });
-        
-        const newAttachment: Attachment = {
-          type: 'image',
-          name: file.name,
-          url: URL.createObjectURL(file),
-          size: file.size,
-          base64: base64String, // Full data URL format: data:image/jpeg;base64,...
-        };
-        setPendingAttachments([...pendingAttachments, newAttachment]);
-        setShowAttachMenu(false);
-        
-        // Reset input so the same file can be selected again
-        if (imageInputRef.current) {
-          imageInputRef.current.value = '';
-        }
-      };
-      reader.onerror = (error) => {
-        console.error('Error reading file:', error);
-        alert('Error al leer la imagen. Por favor intenta de nuevo.');
-        // Reset input
-        if (imageInputRef.current) {
-          imageInputRef.current.value = '';
-        }
-      };
-      reader.readAsDataURL(file);
+      void uploadImageAttachment(file);
     }
   };
 
@@ -362,13 +443,21 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
     const files = e.target.files;
     if (files && files.length > 0) {
       const file = files[0];
+
+      if (file.type.startsWith('image/')) {
+        void uploadImageAttachment(file);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+        return;
+      }
       
       // Validate file type
       const validTypes = [
         'application/pdf',
         'application/msword',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'text/plain'
+        'text/plain',
       ];
       
       const fileExtension = file.name.split('.').pop()?.toLowerCase();
@@ -376,7 +465,7 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
                           ['pdf', 'doc', 'docx', 'txt'].includes(fileExtension || '');
       
       if (!isValidType) {
-        alert('Por favor selecciona un archivo válido (PDF, Word, o TXT)');
+        alert('Por favor selecciona un archivo válido (PDF, Word o TXT)');
         return;
       }
       
@@ -762,21 +851,31 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
       setMessages(prev => prev.filter(m => m.id !== messageId));
       setIsTyping(true);
 
-      // Send the same user message again
-      const { userMessage, aiMessage, chat } = await chatApi.sendMessage(
+      streamAbortRef.current?.abort();
+      const abortController = new AbortController();
+      streamAbortRef.current = abortController;
+
+      const tempAiMessage: Message = {
+        id: `${Date.now()}-ai`,
+        role: 'assistant',
+        content: '',
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, tempAiMessage]);
+
+      let accumulated = '';
+      await streamAssistantResponse(
         currentChatId!,
         previousUserMessage.content,
-        previousUserMessage.attachments
+        previousUserMessage.attachments,
+        abortController.signal,
+        (chunk) => {
+          accumulated += chunk;
+          setMessages(prev => prev.map(m =>
+            m.id === tempAiMessage.id ? { ...m, content: accumulated } : m
+          ));
+        }
       );
-
-      // Add new AI response
-      setMessages(prev => [
-        ...prev,
-        {
-          ...aiMessage,
-          timestamp: new Date(aiMessage.timestamp),
-        },
-      ]);
 
     } catch (error) {
       console.error('Error regenerating response:', error);
@@ -889,12 +988,16 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
             onKeyDown={handleKeyDown}
             placeholder="Escribe tu mensaje..."
             className="w-full px-4 py-3 pr-10 rounded-xl border border-gray-200 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none overflow-y-auto"
-            style={{ minHeight: '48px', maxHeight: '120px', zIndex: 10 }}
+            style={{ minHeight: '48px', maxHeight: '120px', zIndex: 0 }}
             rows={1}
           />
           <button
-            onClick={() => setShowAttachMenu(!showAttachMenu)}
+            onClick={() => {
+              setShowAttachMenu(true);
+              fileInputRef.current?.click();
+            }}
             className="absolute right-2 bottom-3 p-1 hover:bg-gray-100 rounded-lg transition-colors"
+            style={{ zIndex: 10 }}
           >
             <Plus className="w-5 h-5 text-gray-400" />
           </button>
@@ -1265,9 +1368,15 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
                         alt={attachment.name}
                         className="h-20 w-20 object-cover rounded-lg border-2 border-gray-300"
                       />
+                      {attachment.uploading && (
+                        <div className="absolute inset-0 bg-white/70 rounded-lg flex items-center justify-center">
+                          <Loader2 className="w-5 h-5 text-gray-600 animate-spin" />
+                        </div>
+                      )}
                       <button 
                         onClick={() => removeAttachment(idx)}
                         className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1"
+                        disabled={attachment.uploading}
                       >
                         <X className="w-3 h-3" />
                       </button>
@@ -1341,6 +1450,7 @@ export function ClinicalChat({ specialty, onBack }: ClinicalChatProps) {
       <input
         ref={fileInputRef}
         type="file"
+        accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.webp"
         onChange={handleFileUpload}
         className="hidden"
       />

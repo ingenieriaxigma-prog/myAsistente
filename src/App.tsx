@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense } from 'react';
+import { useState, lazy, Suspense, useEffect } from 'react';
 import { useAuth } from './hooks/useAuth';
 import { getNextDiagnosisStep, getPreviousDiagnosisStep } from './utils/navigation';
 import { projectId } from './utils/supabase/info';
@@ -46,7 +46,14 @@ function LoadingFallback() {
 }
 
 export default function App() {
-  const { user, session, loading: authLoading } = useAuth();
+  const {
+  user,
+  session,
+  loading: authLoading,
+  isAuthenticated,
+  signOut
+} = useAuth();
+
   const appUser = user ?? session?.user ?? null;
   const [currentScreen, setCurrentScreen] = useState<Screen>('login');
   const [selectedSpecialty, setSelectedSpecialty] = useState<Specialty>(null);
@@ -105,6 +112,18 @@ export default function App() {
     setGeneratedTreatmentPlan(null); // 🔥 LIMPIAR PLAN DE TRATAMIENTO
     setSavedDiagnosisId(null); // 🔥 LIMPIAR ID DE DIAGNÓSTICO GUARDADO
   };
+
+  // Mantener la pantalla acorde al estado de sesión (OAuth vuelve vía onAuthStateChange)
+  useEffect(() => {
+    if (authLoading) return;
+    if (isAuthenticated) {
+      if (currentScreen === 'login') {
+        setCurrentScreen('specialty-selection');
+      }
+    } else {
+      setCurrentScreen('login');
+    }
+  }, [authLoading, isAuthenticated, currentScreen]);
 
   // 🆕 Función para guardar diagnóstico (simulado por ahora)
   const handleSaveDiagnosis = async () => {
@@ -315,23 +334,27 @@ export default function App() {
   const handleOpenAdmin = () => setCurrentScreen('admin');
   const handleBackFromAdmin = () => setCurrentScreen('profile');
 
-  const handleLogout = () => {
-    setCurrentScreen('login');
-    setSelectedSpecialty(null);
-    setPatientData({
-      gender: null,
-      ageRange: '',
-      hasSymptoms: false,
-      healthDescription: ''
-    });
-    setSelectedSymptoms([]);
-    setSelectedUrinarySymptoms([]);
-    setSelectedProlapseSymptoms([]);
-    setSelectedSexualSymptoms([]);
-    setSelectedMaleSymptoms([]);
-    setSelectedTransSymptoms([]);
+  const handleLogout = async () => {
+    try {
+      await signOut(); // 🔥 esto sí cierra sesión en Supabase
+    } finally {
+      // Mantén tu reset de UI (tal cual lo tienes)
+      setCurrentScreen('login');
+      setSelectedSpecialty(null);
+      setPatientData({
+        gender: null,
+        ageRange: '',
+        hasSymptoms: false,
+        healthDescription: ''
+      });
+      setSelectedSymptoms([]);
+      setSelectedUrinarySymptoms([]);
+      setSelectedProlapseSymptoms([]);
+      setSelectedSexualSymptoms([]);
+      setSelectedMaleSymptoms([]);
+      setSelectedTransSymptoms([]);
+    }
   };
-
   // Handlers del flujo de diagnóstico
   const handleContinueToStep2 = (data: PatientData) => {
     setPatientData(data);
