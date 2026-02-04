@@ -1,9 +1,6 @@
 import { useState } from 'react';
 import { Heart, Eye, EyeOff, Mail, Lock, User } from 'lucide-react';
 import { TermsModal } from './TermsModal';
-import { ScreenContainer } from './common/ScreenContainer';
-import { GradientHeader } from './common/GradientHeader';
-import { GradientButton } from './common/GradientButton';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../services/api';
 
@@ -25,6 +22,18 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
   const { signIn, signUp } = useAuth();
 
   const appGradient = 'from-[#0b2b6b] to-[#1451b3]';
+
+  const [isPrimaryHovered, setIsPrimaryHovered] = useState(false);
+  const activeTabStyle = {
+    background: 'linear-gradient(135deg, #0b2b6b, #1d4ed8)',
+    boxShadow: '0 10px 20px rgba(12, 33, 78, 0.22), inset 0 1px 0 rgba(255,255,255,0.22)',
+    border: '1px solid rgba(255,255,255,0.25)'
+  } as const;
+  const inactiveTabStyle = {
+    background: 'transparent',
+    boxShadow: 'none',
+    border: '1px solid transparent'
+  } as const;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,16 +91,15 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
   };
 
   return (
-    <ScreenContainer className="bg-transparent shadow-none rounded-none">
-      <div className="flex-1 w-full min-h-screen bg-[#f2f5fb] md:bg-[#eef2f7]">
-        <div className="relative mx-auto w-full max-w-[1200px] px-4 py-10 md:px-10 md:py-16">
-          <div className="absolute inset-0 -z-10">
-            <div className="absolute -top-20 left-8 h-48 w-48 rounded-full bg-[#0b2b6b]/10 blur-[60px]" />
-            <div className="absolute bottom-6 right-8 h-52 w-52 rounded-full bg-[#1451b3]/10 blur-[70px]" />
-          </div>
+    <div className="min-h-screen w-full bg-[#f2f5fb] md:bg-[#eef2f7] flex flex-col justify-center items-center">
+      <div className="relative mx-auto flex w-full max-w-[1200px] flex-col px-4 py-8 md:px-10 md:py-10">
+        <div className="absolute inset-0 -z-10 pointer-events-none">
+          <div className="absolute -top-20 left-8 h-48 w-48 rounded-full bg-[#0b2b6b]/10 blur-[60px]" />
+          <div className="absolute bottom-6 right-8 h-52 w-52 rounded-full bg-[#1451b3]/10 blur-[70px]" />
+        </div>
 
-          <div className="grid items-center gap-8 md:grid-cols-[1.05fr_0.95fr]">
-            <div className="hidden md:block">
+          <div className="grid justify-items-center gap-8 lg:grid-cols-[1fr_560px] lg:justify-items-stretch">
+            <div className="hidden lg:block">
               <div className="rounded-[28px] border border-[#e1e7f3] bg-white/80 p-8 shadow-[0_12px_30px_rgba(9,20,44,0.08)] backdrop-blur">
                 <div className={`inline-flex items-center gap-3 rounded-2xl bg-gradient-to-br ${appGradient} px-4 py-3 text-white shadow-[0_10px_24px_rgba(11,43,107,0.24)]`}>
                   <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15">
@@ -124,8 +132,11 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
               </div>
             </div>
 
-            <div className="w-full">
-              <div className="mx-auto w-full max-w-[520px] rounded-[28px] border border-[#e3e9f5] bg-white p-6 shadow-[0_12px_28px_rgba(11,23,43,0.08)] md:p-8">
+            <div className="w-full justify-self-center lg:justify-self-end">
+              <div
+                className="relative z-10 mx-auto w-full rounded-[28px] border border-[#e3e9f5] bg-white p-6 shadow-[0_12px_28px_rgba(11,23,43,0.08)] md:p-8"
+                style={{ maxWidth: 560, pointerEvents: 'auto' }}
+              >
                 <div className="mb-6 flex items-center justify-between">
                   <div>
                     <p className="text-xs uppercase tracking-[0.3em] text-[#9aa7bd]">MyAsistente</p>
@@ -138,24 +149,26 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
                   </div>
                 </div>
 
-                <div className="flex gap-2 rounded-2xl bg-[#f1f4fb] p-1">
+                <div className="flex items-center gap-2 rounded-2xl bg-[#eef2ff] p-1.5 ring-1 ring-[#dfe7f7] shadow-[inset_0_0_0_1px_rgba(15,23,42,0.04)]">
                   <button
+                    type="button"
                     onClick={() => setIsLogin(true)}
-                    className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all ${
-                      isLogin
-                        ? 'bg-white text-[#0b2b6b] shadow-[0_6px_16px_rgba(15,30,60,0.12)]'
-                        : 'text-[#64748b]'
+                    aria-pressed={isLogin}
+                    className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+                      isLogin ? 'text-white' : 'text-[#64748b] hover:text-[#0b2b6b]'
                     }`}
+                    style={isLogin ? activeTabStyle : inactiveTabStyle}
                   >
                     Iniciar sesión
                   </button>
                   <button
+                    type="button"
                     onClick={() => setIsLogin(false)}
-                    className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all ${
-                      !isLogin
-                        ? 'bg-white text-[#0b2b6b] shadow-[0_6px_16px_rgba(15,30,60,0.12)]'
-                        : 'text-[#64748b]'
+                    aria-pressed={!isLogin}
+                    className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+                      !isLogin ? 'text-white' : 'text-[#64748b] hover:text-[#0b2b6b]'
                     }`}
+                    style={!isLogin ? activeTabStyle : inactiveTabStyle}
                   >
                     Registro
                   </button>
@@ -231,15 +244,21 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
                     </div>
                   )}
 
-                  <GradientButton
+                  <button
                     type="submit"
-                    gradient={appGradient}
-                    fullWidth
-                    className="py-3.5 text-sm font-semibold"
                     disabled={loading}
+                    className="flex w-full items-center justify-center rounded-2xl px-4 py-3.5 text-sm font-semibold shadow-[0_12px_24px_rgba(11,43,107,0.25)] transition-all hover:shadow-[0_16px_30px_rgba(11,43,107,0.32)] disabled:cursor-not-allowed disabled:opacity-50"
+                    style={{
+                      background: isPrimaryHovered
+                        ? 'linear-gradient(90deg, #0a255c, #0f47a6)'
+                        : 'linear-gradient(90deg, #0b2b6b, #1451b3)',
+                      color: '#ffffff'
+                    }}
+                    onMouseEnter={() => setIsPrimaryHovered(true)}
+                    onMouseLeave={() => setIsPrimaryHovered(false)}
                   >
                     {loading ? 'Procesando...' : (isLogin ? 'Iniciar Sesión' : 'Crear Cuenta')}
-                  </GradientButton>
+                  </button>
                 </form>
 
                 <div className="my-6 flex items-center gap-4">
@@ -298,7 +317,6 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
               </div>
             </div>
           </div>
-        </div>
       </div>
 
       {/* Modal de Términos y Condiciones */}
@@ -307,6 +325,6 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
         onClose={() => setShowTermsModal(false)}
         onAccept={handleAcceptTerms}
       />
-    </ScreenContainer>
+    </div>
   );
 }
